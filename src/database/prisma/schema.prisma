@@ -1,0 +1,358 @@
+// Yu-tomation — Prisma schema
+//
+// Philosophy: Stateless Media, Stateful Knowledge.
+// This schema persists KNOWLEDGE only (topics, scripts, scene plans, workflow
+// state, upload references, embeddings, logs).
+// It must never persist binary media (images, audio, video, subtitle files).
+
+generator client {
+  provider        = "prisma-client"
+  // Generated inside the database layer: it is infrastructure, it is never
+  // committed, and it must stay reachable from `rootDir: src` during build.
+  output          = "../generated"
+  runtime         = "nodejs"
+  moduleFormat    = "esm"
+  // Lets Prisma Migrate own the pgvector extension instead of hand-written SQL.
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+// Prisma 7 resolves connection URLs from `prisma.config.ts` (CLI) and from the
+// driver adapter passed to `new PrismaClient()` (runtime).
+datasource db {
+  provider   = "postgresql"
+  extensions = [vector]
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+/// Lifecycle of a topic candidate.
+enum TopicStatus {
+  CANDIDATE
+  ACCEPTED
+  REJECTED_DUPLICATE
+  ARCHIVED
+}
+
+/// Coarse-grained recovery checkpoint of a workflow run.
+/// The workflow resumes from the latest successful checkpoint, never from zero.
+enum WorkflowStatus {
+  PENDING
+  TOPIC_CREATED
+  SCRIPT_CREATED
+  SCENE_CREATED
+  IMAGES_CREATED
+  VOICE_CREATED
+  SUBTITLE_CREATED
+  VIDEO_CREATED
+  UPLOAD_COMPLETED
+  COMPLETED
+  FAILED
+}
+
+/// Individual, retryable unit of work inside a workflow run.
+enum WorkflowStepName {
+  TOPIC
+  SCRIPT
+  SCENE
+  VISUAL_PLAN
+  IMAGE
+  NARRATION_PLAN
+  VOICE
+  SUBTITLE
+  RENDER_PLAN
+  COMPOSE
+  QUALITY_CHECK
+  UPLOAD
+  CLEANUP
+}
+
+/// Execution state of a single workflow step.
+enum WorkflowStepStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  SKIPPED
+}
+
+/// Distribution target. Only TikTok is in scope today; the enum is the
+/// extension point for Instagram / YouTube Shorts / Facebook Reels.
+enum UploadPlatform {
+  TIKTOK
+}
+
+/// Lifecycle of a publish attempt. Media may only be deleted after VERIFIED.
+enum UploadStatus {
+  PENDING
+  UPLOADING
+  UPLOADED
+  VERIFIED
+  FAILED
+}
+
+/// Severity of a persisted structured log entry.
+enum LogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+}
+
+// ---------------------------------------------------------------------------
+// Knowledge
+// ---------------------------------------------------------------------------
+
+/// A unique content subject. Owned by TopicRepository.
+model Topic {
+  id              String      @id @default(uuid()) @db.Uuid
+  /// Human readable title as produced by the Topic Agent.
+  title           String      @db.VarChar(500)
+  /// Lowercased / whitespace-collapsed title used for exact duplicate lookup.
+  normalizedTitle String      @unique @map("normalized_title") @db.VarChar(500)
+  description     String?     @db.Text
+  language        String      @default("en") @db.VarChar(16)
+  /// Thematic area the topic was drawn from, e.g. "personal finance".
+  category        String?     @db.VarChar(255)
+  /// Who the video is for, e.g. "first-time investors".
+  audience        String?     @db.VarChar(255)
+  status          TopicStatus @default(CANDIDATE)
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  embedding TopicEmbedding?
+  contents  Content[]
+  runs      WorkflowRun[]
+
+  @@index([status, createdAt])
+  @@map("topics")
+}
+
+/// Vector representation of a topic, used for semantic duplicate rejection.
+/// Owned by EmbeddingRepository.
+model TopicEmbedding {
+  id         String   @id @default(uuid()) @db.Uuid
+  topicId    String   @unique @map("topic_id") @db.Uuid
+  /// Identifier of the embedding model, e.g. "text-embedding-3-small".
+  model      String   @db.VarChar(128)
+  dimensions Int
+  /// pgvector column. Similarity search is executed by EmbeddingRepository.
+  vector     Unsupported("vector(1536)")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@map("topic_embeddings")
+}
+
+/// Everything the pipeline authors for a topic: script, caption, hashtags,
+/// thumbnail prompt and the scene plan. Owned by ContentRepository.
+model Content {
+  id              String   @id @default(uuid()) @db.Uuid
+  topicId         String   @map("topic_id") @db.Uuid
+  title           String   @db.VarChar(500)
+  /// First spoken line of the narration.
+  hook            String?  @db.Text
+  script          String   @db.Text
+  caption         String?  @db.Text
+  hashtags        String[] @default([])
+  thumbnailPrompt String?  @map("thumbnail_prompt") @db.Text
+  /// Scene plan produced by the Scene Agent (SceneDto[] serialised as JSON).
+  scenePlan       Json?    @map("scene_plan")
+  /// Image briefs produced by the Visual Planner Agent (VisualPromptDto[]).
+  visualPlan      Json?    @map("visual_plan")
+  /// Narration blocks produced by the Narration Planner Agent
+  /// (NarrationBlockDto[]). The audio and the subtitles are both rendered from
+  /// this, which is why the plan is knowledge and the files are not.
+  narrationPlan   Json?    @map("narration_plan")
+  language        String   @default("en") @db.VarChar(16)
+  /// Spoken length the script was written for.
+  targetDurationSeconds Int? @map("target_duration_seconds")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  topic   Topic         @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  runs    WorkflowRun[]
+  uploads Upload[]
+  images  SceneImage[]
+  videos  RenderedVideo[]
+
+  @@index([topicId])
+  @@map("contents")
+}
+
+/// Metadata of one generated still. Owned by ImageRepository.
+///
+/// The image bytes are never stored here: they live in the run's working
+/// directory until the video is rendered and are deleted afterwards. What
+/// survives is where the file was, what produced it, and what it cost —
+/// enough to reproduce it, and nothing that would make media permanent.
+model SceneImage {
+  id            String   @id @default(uuid()) @db.Uuid
+  contentId     String   @map("content_id") @db.Uuid
+  /// Run whose working directory held the file.
+  workflowRunId String?  @map("workflow_run_id") @db.Uuid
+  /// 1-based scene number the image illustrates.
+  sceneNumber   Int      @map("scene_number")
+  /// Always `scene-NNN.png`.
+  fileName      String   @map("file_name") @db.VarChar(255)
+  /// Path relative to the workspace root, e.g. `images/scene-001.png`.
+  relativePath  String   @map("relative_path") @db.VarChar(1000)
+  byteSize      Int      @map("byte_size")
+  width         Int
+  height        Int
+  /// Time the router took to produce the image.
+  generationDurationMs Int @map("generation_duration_ms")
+  /// Router combo alias that produced it.
+  combo         String   @db.VarChar(128)
+  /// The assembled prompt, kept so the image can be reproduced.
+  prompt        String   @db.Text
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, sceneNumber])
+  @@index([workflowRunId])
+  @@map("scene_images")
+}
+
+/// Metadata of one rendered video. Owned by VideoRepository.
+///
+/// The container itself is never stored here: it lives in the run's working
+/// directory until it is published and is deleted afterwards. What survives is
+/// what it cost and what it is — enough to answer "was this render acceptable"
+/// without keeping the file.
+model RenderedVideo {
+  id            String   @id @default(uuid()) @db.Uuid
+  contentId     String   @map("content_id") @db.Uuid
+  /// Run whose working directory held the file.
+  workflowRunId String?  @map("workflow_run_id") @db.Uuid
+  /// Always `final.mp4`.
+  fileName      String   @map("file_name") @db.VarChar(255)
+  /// Path relative to the workspace root, e.g. `video/final.mp4`.
+  relativePath  String   @map("relative_path") @db.VarChar(1000)
+  byteSize      Int      @map("byte_size")
+  width         Int
+  height        Int
+  fps           Int
+  /// Measured length of the container, in milliseconds.
+  durationMs    Int      @map("duration_ms")
+  videoCodec    String   @map("video_codec") @db.VarChar(64)
+  audioCodec    String   @map("audio_codec") @db.VarChar(64)
+  /// Wall-clock time FFmpeg took.
+  renderDurationMs Int   @map("render_duration_ms")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, workflowRunId])
+  @@index([workflowRunId])
+  @@map("rendered_videos")
+}
+
+// ---------------------------------------------------------------------------
+// Workflow state
+// ---------------------------------------------------------------------------
+
+/// One end-to-end execution of the content pipeline.
+/// Owned by WorkflowRepository.
+model WorkflowRun {
+  id            String         @id @default(uuid()) @db.Uuid
+  /// Correlation identifier shared by every log line of this run.
+  correlationId String         @unique @map("correlation_id") @db.VarChar(64)
+  status        WorkflowStatus @default(PENDING)
+  topicId       String?        @map("topic_id") @db.Uuid
+  contentId     String?        @map("content_id") @db.Uuid
+  startedAt     DateTime?      @map("started_at")
+  finishedAt    DateTime?      @map("finished_at")
+  /// Serialised ApplicationError of the failure that aborted the run.
+  lastError     Json?          @map("last_error")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  topic   Topic?            @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  content Content?          @relation(fields: [contentId], references: [id], onDelete: SetNull)
+  steps   WorkflowStepRun[]
+  logs    LogEntry[]
+
+  @@index([status, createdAt])
+  @@map("workflow_runs")
+}
+
+/// Execution record of a single step inside a run. Enables precise resume:
+/// the workflow restarts at the first step that is not SUCCEEDED.
+model WorkflowStepRun {
+  id            String             @id @default(uuid()) @db.Uuid
+  workflowRunId String             @map("workflow_run_id") @db.Uuid
+  step          WorkflowStepName
+  status        WorkflowStepStatus @default(PENDING)
+  attempt       Int                @default(0)
+  durationMs    Int?               @map("duration_ms")
+  startedAt     DateTime?          @map("started_at")
+  finishedAt    DateTime?          @map("finished_at")
+  /// Serialised ApplicationError of the last failed attempt.
+  lastError     Json?              @map("last_error")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+
+  run WorkflowRun @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowRunId, step])
+  @@index([status])
+  @@map("workflow_step_runs")
+}
+
+// ---------------------------------------------------------------------------
+// Distribution
+// ---------------------------------------------------------------------------
+
+/// Reference to a published video. The video itself is deleted after
+/// verification. Owned by UploadRepository.
+model Upload {
+  id         String         @id @default(uuid()) @db.Uuid
+  contentId  String         @map("content_id") @db.Uuid
+  platform   UploadPlatform
+  status     UploadStatus   @default(PENDING)
+  /// Public URL of the published video.
+  externalUrl String?       @map("external_url") @db.VarChar(1000)
+  /// Platform-side identifier of the published video.
+  externalId String?        @map("external_id") @db.VarChar(255)
+  uploadedAt DateTime?      @map("uploaded_at")
+  verifiedAt DateTime?      @map("verified_at")
+  lastError  Json?          @map("last_error")
+  createdAt  DateTime       @default(now()) @map("created_at")
+  updatedAt  DateTime       @updatedAt @map("updated_at")
+
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, platform])
+  @@index([status])
+  @@map("uploads")
+}
+
+// ---------------------------------------------------------------------------
+// Observability
+// ---------------------------------------------------------------------------
+
+/// Durable structured log. Owned by LogRepository.
+model LogEntry {
+  id            String            @id @default(uuid()) @db.Uuid
+  correlationId String            @map("correlation_id") @db.VarChar(64)
+  workflowRunId String?           @map("workflow_run_id") @db.Uuid
+  level         LogLevel
+  step          WorkflowStepName?
+  /// Name of the emitting component, e.g. "TopicAgent".
+  source        String?           @db.VarChar(128)
+  message       String            @db.Text
+  durationMs    Int?              @map("duration_ms")
+  retryCount    Int?              @map("retry_count")
+  context       Json?
+  createdAt     DateTime          @default(now()) @map("created_at")
+
+  run WorkflowRun? @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+
+  @@index([correlationId, createdAt])
+  @@index([level, createdAt])
+  @@map("log_entries")
+}

@@ -1,0 +1,68 @@
+name: yu-tomation
+
+services:
+  postgres:
+    # pgvector ships the `vector` extension that Prisma enables through the
+    # initial migration. A plain `postgres` image would not be able to run it.
+    image: pgvector/pgvector:pg17
+    container_name: yu-tomation-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-yutomation}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-locally}
+      POSTGRES_DB: ${POSTGRES_DB:-yutomation}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-yutomation} -d ${POSTGRES_DB:-yutomation}']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  kokoro:
+    # Text to speech, behind an OpenAI-compatible /v1/audio/speech endpoint.
+    # The CPU image needs no GPU and is what KOKORO_BASE_URL points at by
+    # default; swap the tag for `-gpu` on a machine that has one.
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:latest
+    container_name: yu-tomation-kokoro
+    restart: unless-stopped
+    ports:
+      - '${KOKORO_PORT:-8880}:8880'
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -sf http://localhost:8880/v1/models || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: yu-tomation-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kokoro:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # Inside the compose network the database is reachable by service name.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-yutomation}:${POSTGRES_PASSWORD:-change-me-locally}@postgres:5432/${POSTGRES_DB:-yutomation}?schema=public
+      # Inside the compose network the speech server is reachable by name.
+      KOKORO_BASE_URL: http://kokoro:8880/v1
+      PROMPTS_DIR: dist/prompts
+      OUTPUT_DIR: /app/output
+    volumes:
+      # Generated media is disposable; a named volume keeps it out of the image
+      # and out of the repository.
+      - media-scratch:/app/output
+
+volumes:
+  postgres-data:
+  media-scratch:

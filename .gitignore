@@ -7,6 +7,10 @@ dist/
 build/
 out/
 *.tsbuildinfo
+coverage/
+
+# Prisma Client (regenerated from the schema by `pnpm db:generate`)
+src/database/generated/
 
 # Logs & Diagnostics
 logs/
