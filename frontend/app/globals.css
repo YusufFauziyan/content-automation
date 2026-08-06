@@ -1,0 +1,332 @@
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap');
+@import 'tailwindcss';
+
+.font-script {
+  font-family: 'Caveat', cursive, sans-serif;
+}
+
+/* ============================================================
+   Tokens — two themes off one ramp. Neutrals carry a violet bias
+   so the accent reads as part of the surface, not on top of grey.
+
+   Dark is the default and the values below are its own. Light
+   overrides them under `[data-theme='light']`, which the inline
+   script in the layout sets before anything paints.
+   ============================================================ */
+@theme {
+  --color-void: #08070c;
+  --color-sunk: #0c0b12;
+  --color-base: #110f19;
+  --color-rise: #181622;
+  --color-lift: #1f1c2b;
+
+  --color-ink: #f0eef8;
+  --color-dim: #9c97b4;
+  --color-faint: #67637e;
+
+  --color-accent: #7c5cff;
+  --color-accent-hi: #a594ff;
+
+  /**
+   * Text and icons that sit *on* the accent.
+   *
+   * Kept apart from `white` on purpose: light mode flips `--color-white` to a
+   * dark ink so the hundred-odd `border-white/8` hairlines keep working, and
+   * anything genuinely on a violet fill must not follow it.
+   */
+  --color-on-accent: #ffffff;
+
+  --color-node-trigger: #3dd68c;
+  --color-node-ai: #8b7bff;
+  --color-node-media: #4ca6ff;
+  --color-node-video: #ff6b6b;
+  --color-node-upload: #ff7ac6;
+  --color-node-logic: #ffa24c;
+
+  --color-ok: #3dd68c;
+  --color-warn: #ffa24c;
+  --color-err: #ff6b6b;
+
+  --radius-node: 16px;
+
+  --ease-house: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+}
+
+/* ============================================================
+   Light
+
+   `--color-white` is the lever. Every hairline and tint in this
+   app is written as `white/N`, which Tailwind compiles through
+   that variable — so flipping it to a dark ink turns a hundred
+   translucent-white borders into translucent-dark ones at once,
+   with no component touched.
+
+   The neutral ramp inverts around it: the page is the most
+   tinted surface and panels are the lightest, which is the same
+   relationship dark has, read the other way up.
+   ============================================================ */
+:root[data-theme='light'] {
+  --color-void: #f8f7fc;
+  --color-sunk: #f3effc;
+  --color-base: #ffffff;
+  --color-rise: #ffffff;
+  --color-lift: #f4effd;
+
+  --color-ink: #140e26;
+  --color-dim: #544b6c;
+  --color-faint: #887e9d;
+
+  --color-white: #140e26;
+
+  /* Opero Rich Purple Accent Ramp */
+  --color-accent: #6b38c2;
+  --color-accent-hi: #8b46f0;
+
+  /* Node colors tuned for light field */
+  --color-node-trigger: #0f8f56;
+  --color-node-ai: #6b38c2;
+  --color-node-media: #1a71bd;
+  --color-node-video: #cf3b3b;
+  --color-node-upload: #c23a8c;
+  --color-node-logic: #b06510;
+
+  --color-ok: #0f8f56;
+  --color-warn: #b06510;
+  --color-err: #cf3b3b;
+
+  --node-trigger: #0f8f56;
+  --node-ai: #6045dd;
+  --node-media: #1a71bd;
+  --node-video: #cf3b3b;
+  --node-upload: #c23a8c;
+  --node-logic: #b06510;
+
+  --canvas-dot: rgb(23 20 38 / 0.1);
+  --canvas-edge: rgb(23 20 38 / 0.18);
+  --scroll-thumb: #d6d0e6;
+  --scroll-thumb-hover: #c3bcd8;
+  --shadow-modal: rgb(90 80 130 / 0.22);
+  --shimmer-band: rgb(23 20 38 / 0.04);
+  /* A card on white needs a hint of a shadow, not the well a dark field wants. */
+  --shadow-card: rgb(90 80 130 / 0.1);
+  --shadow-card-deep: rgb(90 80 130 / 0.16);
+
+  color-scheme: light;
+}
+
+:root {
+  --node-trigger: #3dd68c;
+  --node-ai: #8b7bff;
+  --node-media: #4ca6ff;
+  --node-video: #ff6b6b;
+  --node-upload: #ff7ac6;
+  --node-logic: #ffa24c;
+
+  /* Surfaces that are drawn rather than classed: the canvas grid and its
+     edges, the scrollbar, the modal shadow. Named so light can restate them. */
+  --canvas-dot: rgb(255 255 255 / 0.07);
+  --canvas-edge: rgb(255 255 255 / 0.16);
+  --scroll-thumb: #262336;
+  --scroll-thumb-hover: #322e45;
+  --shadow-modal: rgb(0 0 0 / 0.9);
+  --shimmer-band: rgb(255 255 255 / 0.05);
+  --shadow-card: rgb(0 0 0 / 0.4);
+  --shadow-card-deep: rgb(0 0 0 / 0.8);
+
+  color-scheme: dark;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-void);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes yu-flow-dash {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-flow-dash {
+  stroke-dasharray: 6 6;
+  animation: yu-flow-dash 1s linear infinite;
+}
+
+/* Smoothing tuned for light text on dark. On dark text on light it thins the
+   strokes to the point of looking broken. */
+:root[data-theme='light'] body {
+  -webkit-font-smoothing: auto;
+}
+
+.mono,
+code,
+kbd {
+  font-family: var(--font-mono);
+  font-variant-ligatures: none;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Scrollbars kept quiet — they are chrome, not content. */
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scroll-thumb-hover);
+  background-clip: content-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes yu-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.7);
+  }
+}
+.animate-status {
+  animation: yu-pulse 1.05s ease-in-out infinite;
+}
+
+/* ============================================================
+   Running ring
+   A light travelling around the card's edge while its step is
+   executing. It reads as "this is where the work is" from the
+   far side of the canvas, which a status pill does not.
+   ============================================================ */
+@property --yu-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes yu-orbit {
+  to {
+    --yu-angle: 360deg;
+  }
+}
+
+.running-ring::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--yu-angle),
+    transparent 0deg,
+    transparent 200deg,
+    var(--color-accent) 300deg,
+    var(--color-accent-hi) 340deg,
+    transparent 360deg
+  );
+  /* Paint only the border band: fill the box, punch out the middle. */
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: yu-orbit 1.8s linear infinite;
+  pointer-events: none;
+}
+
+/* A soft bloom under the card, so the movement is visible even when the ring
+   itself is behind another node. */
+.running-ring::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  box-shadow: 0 0 24px -6px var(--color-accent);
+  opacity: 0.55;
+  animation: yu-breathe 1.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes yu-breathe {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* Where the angle cannot be animated, the ring still draws — it simply holds
+   still, and the status pill continues to carry the meaning. */
+@media (prefers-reduced-motion: reduce) {
+  .running-ring::before,
+  .running-ring::after {
+    animation: none;
+  }
+  .running-ring::after {
+    opacity: 0.4;
+  }
+}
+
+@keyframes yu-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+.shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, var(--shimmer-band), transparent);
+  animation: yu-shimmer 1.6s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

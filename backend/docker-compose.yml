@@ -1,0 +1,33 @@
+name: yu-tomation
+
+# The database on its own, for working on the backend with `pnpm dev`/`pnpm
+# serve` running on the host (`pnpm db:up`). The whole stack — API, editor and
+# migrations included — is the compose file in the repository root.
+#
+# Same project and volume names as that one, so both see the same data; only one
+# of the two can hold the container at a time.
+
+services:
+  postgres:
+    # pgvector ships the `vector` extension that Prisma enables through the
+    # initial migration. A plain `postgres` image would not be able to run it.
+    image: pgvector/pgvector:pg17
+    container_name: yu-tomation-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-yutomation}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-locally}
+      POSTGRES_DB: ${POSTGRES_DB:-yutomation}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-yutomation} -d ${POSTGRES_DB:-yutomation}']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  postgres-data:

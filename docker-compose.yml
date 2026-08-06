@@ -1,5 +1,18 @@
 name: yu-tomation
 
+# ---------------------------------------------------------------------------
+# The whole product in one command: database, migrations, API, editor.
+#
+#   docker-compose up -d --build     everything
+#   docker-compose logs -f backend   what a run is doing
+#   docker-compose down              stop; the database survives
+#
+# Secrets are not duplicated here. Each half keeps reading the env file it
+# already uses — backend/.env and frontend/.env.local — and this file overrides
+# only what containers must see differently from a laptop: service names instead
+# of localhost, and the shared media volume instead of ../backend/output.
+# ---------------------------------------------------------------------------
+
 services:
   postgres:
     # pgvector ships the `vector` extension that Prisma enables through the
@@ -22,46 +35,110 @@ services:
       timeout: 5s
       retries: 20
 
-  kokoro:
-    # Text to speech, behind an OpenAI-compatible /v1/audio/speech endpoint.
-    # The CPU image needs no GPU and is what KOKORO_BASE_URL points at by
-    # default; swap the tag for `-gpu` on a machine that has one.
-    image: ghcr.io/remsky/kokoro-fastapi-cpu:latest
-    container_name: yu-tomation-kokoro
-    restart: unless-stopped
-    ports:
-      - '${KOKORO_PORT:-8880}:8880'
-    healthcheck:
-      test: ['CMD-SHELL', 'curl -sf http://localhost:8880/v1/models || exit 1']
-      interval: 10s
-      timeout: 5s
-      retries: 30
-      start_period: 60s
-
-  app:
+  # Runs the migrations once and exits. A separate service rather than a line in
+  # the backend's command, so a schema that fails to apply is reported as itself
+  # instead of as an API that will not start.
+  migrate:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
-    container_name: yu-tomation-app
+    image: yu-tomation-backend:local
+    container_name: yu-tomation-migrate
+    restart: 'no'
+    # The Prisma CLI insists on write access to its own engine directory, which
+    # belongs to root in the image. Only this one-shot container needs it; the
+    # API below still runs as the unprivileged `node` user.
+    user: root
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-yutomation}:${POSTGRES_PASSWORD:-change-me-locally}@postgres:5432/${POSTGRES_DB:-yutomation}?schema=public
+    command: ['node_modules/.bin/prisma', 'migrate', 'deploy']
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: yu-tomation-backend:local
+    container_name: yu-tomation-backend
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
-      kokoro:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     env_file:
-      - .env
+      - ./backend/.env
     environment:
       # Inside the compose network the database is reachable by service name.
       DATABASE_URL: postgresql://${POSTGRES_USER:-yutomation}:${POSTGRES_PASSWORD:-change-me-locally}@postgres:5432/${POSTGRES_DB:-yutomation}?schema=public
-      # Inside the compose network the speech server is reachable by name.
-      KOKORO_BASE_URL: http://kokoro:8880/v1
+      NODE_ENV: production
+      HTTP_PORT: 4000
       PROMPTS_DIR: dist/prompts
       OUTPUT_DIR: /app/output
+    # `serve` is the long-running command: the HTTP API the editor talks to,
+    # plus the scheduler tick. Without it the image would run one CLI job.
+    command: ['node', 'dist/main.js', 'serve']
+    ports:
+      - '${BACKEND_PORT:-4000}:4000'
     volumes:
       # Generated media is disposable; a named volume keeps it out of the image
-      # and out of the repository.
+      # and out of the repository. Shared with the editor, which reads the
+      # stills and the finished video straight off it.
       - media-scratch:/app/output
+    healthcheck:
+      # The runtime image is slim and has no curl, so Node does the asking.
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:4000/api/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: yu-tomation-frontend:local
+    container_name: yu-tomation-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    env_file:
+      # Optional: the editor boots on its defaults, and only the speech preview
+      # and the sign-in password come from here.
+      - path: ./frontend/.env.local
+        required: false
+    environment:
+      # Service name, not localhost: inside the network there is no backend on
+      # the editor's own loopback.
+      YU_BACKEND_URL: http://backend:4000
+      # The same volume the backend writes into. Read-write, because replacing a
+      # scene's image is done from the editor.
+      YU_MEDIA_ROOT: /media
+    ports:
+      - '${FRONTEND_PORT:-3000}:3000'
+    volumes:
+      - media-scratch:/media
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
 
 volumes:
   postgres-data:

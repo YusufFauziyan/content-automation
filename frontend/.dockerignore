@@ -1,0 +1,14 @@
+node_modules
+.next
+.next-prod
+*.tsbuildinfo
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+.claude
+README.md
+design-spec.html

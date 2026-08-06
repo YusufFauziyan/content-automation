@@ -1,0 +1,13 @@
+{
+  "/api/runs/route": "app/api/runs/route.js",
+  "/api/auth/login/route": "app/api/auth/login/route.js",
+  "/icon.svg/route": "app/icon.svg/route.js",
+  "/api/media/[...path]/route": "app/api/media/[...path]/route.js",
+  "/api/runs/[runId]/route": "app/api/runs/[runId]/route.js",
+  "/api/runs/[runId]/stream/route": "app/api/runs/[runId]/stream/route.js",
+  "/workflows/[runId]/page": "app/workflows/[runId]/page.js",
+  "/login/page": "app/login/page.js",
+  "/page": "app/page.js",
+  "/(app)/dashboard/page": "app/(app)/dashboard/page.js",
+  "/(app)/workflows/page": "app/(app)/workflows/page.js"
+}

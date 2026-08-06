@@ -1,0 +1,3 @@
+# Next.js pulls sharp in for image optimisation; it needs its install script.
+allowBuilds:
+  sharp: true

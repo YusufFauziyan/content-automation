@@ -1,0 +1,1598 @@
+<title>Yu-tomation — AI Workflow Builder</title>
+
+<style>
+/* ============================================================
+   TOKENS
+   Page chrome adapts to the viewer's theme.
+   The editor keeps its own fixed dark palette — the canvas is
+   the product's identity, the way Figma and Linear commit.
+   ============================================================ */
+:root{
+  --p-bg:#F7F6FA; --p-surface:#FFFFFF; --p-raised:#FFFFFF;
+  --p-line:#E5E2EE; --p-line-soft:#EFEDF5;
+  --p-text:#141221; --p-dim:#5C5870; --p-faint:#8E8AA3;
+  --p-accent:#5B3FE8; --p-accent-soft:#EDE9FE;
+  --p-shadow:0 1px 2px rgba(20,18,33,.05), 0 8px 24px -12px rgba(20,18,33,.12);
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --p-bg:#08070C; --p-surface:#100E17; --p-raised:#16141F;
+    --p-line:#221F2E; --p-line-soft:#1A1825;
+    --p-text:#EDEBF5; --p-dim:#9793AC; --p-faint:#6E6A84;
+    --p-accent:#9B87FF; --p-accent-soft:#1D1733;
+    --p-shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 28px -14px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="light"]{
+  --p-bg:#F7F6FA; --p-surface:#FFFFFF; --p-raised:#FFFFFF;
+  --p-line:#E5E2EE; --p-line-soft:#EFEDF5;
+  --p-text:#141221; --p-dim:#5C5870; --p-faint:#8E8AA3;
+  --p-accent:#5B3FE8; --p-accent-soft:#EDE9FE;
+  --p-shadow:0 1px 2px rgba(20,18,33,.05), 0 8px 24px -12px rgba(20,18,33,.12);
+}
+:root[data-theme="dark"]{
+  --p-bg:#08070C; --p-surface:#100E17; --p-raised:#16141F;
+  --p-line:#221F2E; --p-line-soft:#1A1825;
+  --p-text:#EDEBF5; --p-dim:#9793AC; --p-faint:#6E6A84;
+  --p-accent:#9B87FF; --p-accent-soft:#1D1733;
+  --p-shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 28px -14px rgba(0,0,0,.7);
+}
+
+/* Editor palette — fixed. Neutrals carry a violet bias so the
+   accent never looks pasted onto a grey. */
+.app{
+  --a-void:#08070C;      /* canvas ground        */
+  --a-sunk:#0C0B12;      /* console, wells       */
+  --a-base:#110F19;      /* panels               */
+  --a-rise:#181622;      /* cards, inputs        */
+  --a-lift:#1F1C2B;      /* hover                */
+  --a-line:rgba(255,255,255,.06);
+  --a-line-hi:rgba(255,255,255,.11);
+  --a-text:#F0EEF8;
+  --a-dim:#9C97B4;
+  --a-faint:#67637E;
+  --a-accent:#7C5CFF;
+  --a-accent-hi:#A594FF;
+  --a-accent-glow:rgba(124,92,255,.30);
+
+  --n-trigger:#3DD68C;
+  --n-ai:#8B7BFF;
+  --n-media:#4CA6FF;
+  --n-video:#FF6B6B;
+  --n-upload:#FF7AC6;
+  --n-logic:#FFA24C;
+
+  --ok:#3DD68C; --warn:#FFA24C; --err:#FF6B6B;
+
+  --r-xs:6px; --r-sm:10px; --r-md:16px; --r-lg:22px; --r-pill:999px;
+
+  --sh-1:0 1px 2px rgba(0,0,0,.5);
+  --sh-2:0 2px 6px rgba(0,0,0,.4), 0 10px 30px -14px rgba(0,0,0,.8);
+  --sh-3:0 4px 12px rgba(0,0,0,.45), 0 24px 60px -20px rgba(0,0,0,.9);
+  --sh-glow:0 0 0 1px var(--a-accent-glow), 0 10px 40px -12px var(--a-accent-glow);
+}
+
+*{box-sizing:border-box;}
+html{-webkit-text-size-adjust:100%;}
+body{
+  margin:0; background:var(--p-bg); color:var(--p-text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,"Helvetica Neue",Arial,sans-serif;
+  font-size:15px; line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+:where(.mono,code,kbd,.num){
+  font-family:ui-monospace,SFMono-Regular,"SF Mono","JetBrains Mono","Fira Code",Menlo,Consolas,monospace;
+  font-variant-ligatures:none;
+}
+.num{font-variant-numeric:tabular-nums;}
+a{color:inherit;}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;}
+:focus-visible{outline:2px solid var(--p-accent);outline-offset:2px;border-radius:4px;}
+
+/* ============================================================
+   PAGE SHELL
+   ============================================================ */
+.wrap{max-width:1560px;margin:0 auto;padding:0 24px;}
+.masthead{padding:72px 0 36px;}
+.eyebrow{
+  font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--p-accent);font-weight:600;margin:0 0 18px;
+}
+.masthead h1{
+  margin:0 0 18px;font-size:clamp(38px,5.2vw,68px);line-height:1.02;
+  letter-spacing:-.035em;font-weight:680;text-wrap:balance;max-width:16ch;
+}
+.masthead h1 em{font-style:normal;color:var(--p-faint);}
+.lede{margin:0;max-width:62ch;font-size:17px;color:var(--p-dim);text-wrap:pretty;}
+.meta-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:28px;}
+.chip{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:6px 12px;border-radius:var(--r-pill);
+  border:1px solid var(--p-line);background:var(--p-surface);
+  font-size:12px;color:var(--p-dim);
+}
+.chip b{color:var(--p-text);font-weight:560;}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+
+/* ============================================================
+   EDITOR FRAME
+   ============================================================ */
+.app{
+  position:relative;border-radius:20px;overflow:hidden;
+  background:var(--a-base);color:var(--a-text);
+  border:1px solid rgba(255,255,255,.07);
+  box-shadow:0 2px 8px rgba(8,7,12,.28), 0 40px 100px -40px rgba(8,7,12,.55);
+  height:820px;display:flex;flex-direction:column;
+  font-size:13px;
+}
+.app-body{flex:1;display:flex;min-height:0;}
+
+/* ---- Top bar ---- */
+.topbar{
+  height:56px;flex:none;display:flex;align-items:center;gap:12px;
+  padding:0 14px;border-bottom:1px solid var(--a-line);
+  background:rgba(17,15,25,.72);backdrop-filter:blur(20px) saturate(160%);
+  position:relative;z-index:40;
+}
+.wf-name{
+  font-size:13.5px;font-weight:560;color:var(--a-text);
+  padding:6px 10px;border-radius:var(--r-sm);border:1px solid transparent;
+  background:none;min-width:60px;transition:background .16s,border-color .16s;
+}
+.wf-name:hover{background:var(--a-rise);}
+.wf-name:focus{outline:none;background:var(--a-rise);border-color:var(--a-accent);}
+.status-pill{
+  display:inline-flex;align-items:center;gap:6px;padding:4px 10px;
+  border-radius:var(--r-pill);font-size:11px;font-weight:560;letter-spacing:.01em;
+  border:1px solid var(--a-line-hi);color:var(--a-dim);background:var(--a-rise);
+  cursor:pointer;transition:border-color .16s,color .16s;
+}
+.status-pill[data-state="active"]{color:var(--ok);border-color:rgba(61,214,140,.32);background:rgba(61,214,140,.08);}
+.status-pill[data-state="active"] .dot{box-shadow:0 0 0 3px rgba(61,214,140,.16);}
+.spacer{flex:1;}
+.tb-search{
+  display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;
+  border-radius:var(--r-sm);background:var(--a-rise);border:1px solid var(--a-line);
+  color:var(--a-faint);width:190px;transition:border-color .16s,width .2s;
+}
+.tb-search:focus-within{border-color:var(--a-accent);width:230px;}
+.tb-search input{
+  flex:1;min-width:0;background:none;border:0;outline:none;color:var(--a-text);
+  font:inherit;font-size:12px;
+}
+.tb-search input::placeholder{color:var(--a-faint);}
+kbd{
+  font-size:10px;padding:2px 5px;border-radius:5px;
+  background:rgba(255,255,255,.05);border:1px solid var(--a-line-hi);color:var(--a-faint);
+}
+.btn{
+  display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px;
+  border-radius:var(--r-sm);font-size:12.5px;font-weight:530;
+  border:1px solid var(--a-line-hi);color:var(--a-dim);background:var(--a-rise);
+  transition:background .16s,color .16s,border-color .16s,transform .12s;
+}
+.btn:hover{background:var(--a-lift);color:var(--a-text);}
+.btn:active{transform:translateY(1px);}
+.btn-ghost{background:none;border-color:transparent;}
+.btn-ghost:hover{background:var(--a-rise);}
+.btn-run{
+  background:var(--a-accent);border-color:transparent;color:#fff;
+  box-shadow:0 1px 0 rgba(255,255,255,.14) inset, 0 6px 20px -8px var(--a-accent-glow);
+}
+.btn-run:hover{background:var(--a-accent-hi);color:#fff;}
+.btn-run[disabled]{opacity:.55;cursor:default;transform:none;}
+.avatar{
+  width:30px;height:30px;border-radius:50%;flex:none;
+  background:linear-gradient(145deg,#7C5CFF,#4CA6FF);
+  display:grid;place-items:center;font-size:11px;font-weight:640;color:#fff;
+  border:1px solid rgba(255,255,255,.18);
+}
+
+/* ---- Sidebar ---- */
+.sidebar{
+  width:224px;flex:none;display:flex;flex-direction:column;
+  border-right:1px solid var(--a-line);background:var(--a-base);
+  transition:width .24s cubic-bezier(.32,.72,0,1);
+  overflow:hidden;
+}
+.app[data-rail="1"] .sidebar{width:60px;}
+.brand{display:flex;align-items:center;gap:10px;padding:14px 14px 10px;height:56px;flex:none;}
+.mark{
+  width:28px;height:28px;border-radius:9px;flex:none;display:grid;place-items:center;
+  background:linear-gradient(150deg,#8B7BFF,#5B3FE8);
+  box-shadow:0 4px 14px -4px var(--a-accent-glow), inset 0 1px 0 rgba(255,255,255,.28);
+}
+.brand-txt{display:flex;flex-direction:column;line-height:1.15;min-width:0;}
+.brand-txt b{font-size:13.5px;font-weight:600;letter-spacing:-.015em;white-space:nowrap;}
+.brand-txt span{font-size:10px;color:var(--a-faint);white-space:nowrap;}
+.nav{flex:1;padding:8px;display:flex;flex-direction:column;gap:1px;overflow-y:auto;}
+.nav-sec{
+  font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--a-faint);
+  padding:14px 10px 6px;white-space:nowrap;font-weight:600;
+}
+.nav-i{
+  display:flex;align-items:center;gap:11px;height:34px;padding:0 10px;
+  border-radius:var(--r-sm);color:var(--a-dim);white-space:nowrap;
+  transition:background .14s,color .14s;position:relative;
+}
+.nav-i:hover{background:var(--a-rise);color:var(--a-text);}
+.nav-i[aria-current="page"]{background:var(--a-rise);color:var(--a-text);}
+.nav-i[aria-current="page"]::before{
+  content:"";position:absolute;left:-8px;top:9px;bottom:9px;width:2.5px;
+  border-radius:0 3px 3px 0;background:var(--a-accent);
+}
+.nav-i svg{flex:none;}
+.nav-i span{font-size:13px;}
+.nav-count{
+  margin-left:auto;font-size:10.5px;color:var(--a-faint);
+  background:var(--a-rise);padding:1px 6px;border-radius:var(--r-pill);
+}
+.nav-i:hover .nav-count{background:var(--a-lift);}
+.app[data-rail="1"] .brand-txt,
+.app[data-rail="1"] .nav-i span,
+.app[data-rail="1"] .nav-count,
+.app[data-rail="1"] .nav-sec,
+.app[data-rail="1"] .side-foot .who{opacity:0;pointer-events:none;}
+.side-foot{padding:8px;border-top:1px solid var(--a-line);display:flex;flex-direction:column;gap:1px;}
+.who{display:flex;align-items:center;gap:9px;padding:8px 10px;min-width:0;}
+.who b{font-size:12px;font-weight:550;display:block;white-space:nowrap;}
+.who span{font-size:10.5px;color:var(--a-faint);white-space:nowrap;}
+.rail-btn{
+  display:flex;align-items:center;justify-content:center;height:30px;
+  border-radius:var(--r-sm);color:var(--a-faint);transition:background .14s,color .14s;
+}
+.rail-btn:hover{background:var(--a-rise);color:var(--a-text);}
+
+/* ---- Canvas ---- */
+.stage{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;}
+.canvas{
+  flex:1;position:relative;overflow:hidden;min-height:0;
+  background:var(--a-void);
+  cursor:grab;
+  touch-action:none;
+}
+.canvas.grabbing{cursor:grabbing;}
+.canvas.marquee-on{cursor:crosshair;}
+.grid{position:absolute;inset:0;pointer-events:none;}
+.vignette{
+  position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(120% 90% at 50% 0%,transparent 40%,rgba(8,7,12,.55) 100%);
+}
+#world{position:absolute;top:0;left:0;transform-origin:0 0;will-change:transform;}
+#edges{position:absolute;top:0;left:0;overflow:visible;pointer-events:none;}
+
+/* ---- Node ---- */
+.node{
+  position:absolute;width:272px;
+  background:var(--a-rise);
+  border:1px solid var(--a-line-hi);
+  border-radius:var(--r-md);
+  box-shadow:var(--sh-2);
+  padding:13px 14px;
+  cursor:grab;
+  transition:transform .16s cubic-bezier(.32,.72,0,1),box-shadow .16s,border-color .16s;
+  user-select:none;
+}
+.node:hover{transform:translateY(-2px);box-shadow:var(--sh-3);border-color:rgba(255,255,255,.16);}
+.node.dragging{cursor:grabbing;transform:none;box-shadow:var(--sh-3);}
+.node.sel{border-color:var(--a-accent);box-shadow:var(--sh-glow),var(--sh-3);}
+.node.marq{border-color:var(--a-accent-hi);}
+.node-top{display:flex;align-items:center;gap:10px;}
+.n-icon{
+  width:32px;height:32px;border-radius:10px;flex:none;display:grid;place-items:center;
+  background:color-mix(in srgb,var(--c) 16%,transparent);
+  color:var(--c);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 26%,transparent);
+}
+.n-txt{min-width:0;flex:1;}
+.n-title{font-size:13px;font-weight:570;letter-spacing:-.008em;color:var(--a-text);}
+.n-sub{font-size:10.5px;color:var(--a-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
+.n-foot{
+  display:flex;align-items:center;gap:8px;margin-top:11px;padding-top:10px;
+  border-top:1px solid var(--a-line);
+}
+.n-state{
+  display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:540;
+  padding:2.5px 8px;border-radius:var(--r-pill);
+  color:var(--a-faint);background:rgba(255,255,255,.045);
+}
+.n-state[data-s="running"]{color:var(--a-accent-hi);background:rgba(124,92,255,.14);}
+.n-state[data-s="done"]{color:var(--ok);background:rgba(61,214,140,.12);}
+.n-state[data-s="warn"]{color:var(--warn);background:rgba(255,162,76,.13);}
+.n-state[data-s="error"]{color:var(--err);background:rgba(255,107,107,.13);}
+.n-state .dot{width:5px;height:5px;}
+.n-state[data-s="running"] .dot{animation:pulse 1.05s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.35;transform:scale(.7);}}
+.n-time{margin-left:auto;font-size:10.5px;color:var(--a-faint);}
+.port{
+  position:absolute;width:11px;height:11px;border-radius:50%;
+  background:var(--a-base);border:2px solid color-mix(in srgb,var(--c) 70%,transparent);
+  top:26px;transition:transform .16s,border-color .16s,box-shadow .16s;
+}
+.port.in{left:-6px;}
+.port.out{right:-6px;}
+.node:hover .port{transform:scale(1.28);box-shadow:0 0 0 4px color-mix(in srgb,var(--c) 14%,transparent);}
+.n-bar{
+  position:absolute;left:14px;right:14px;bottom:7px;height:2px;border-radius:2px;
+  background:rgba(255,255,255,.07);overflow:hidden;opacity:0;transition:opacity .2s;
+}
+.node[data-s="running"] .n-bar{opacity:1;}
+.n-bar i{display:block;height:100%;width:0;background:var(--a-accent);border-radius:2px;transition:width .3s linear;}
+
+/* ---- Canvas overlays ---- */
+.canvas-tools{
+  position:absolute;left:16px;bottom:16px;display:flex;gap:6px;padding:5px;
+  border-radius:var(--r-md);background:rgba(17,15,25,.78);
+  backdrop-filter:blur(18px) saturate(160%);border:1px solid var(--a-line-hi);
+  box-shadow:var(--sh-2);z-index:12;
+}
+.tool{
+  width:30px;height:30px;border-radius:var(--r-sm);display:grid;place-items:center;
+  color:var(--a-dim);transition:background .14s,color .14s;
+}
+.tool:hover{background:var(--a-lift);color:var(--a-text);}
+.zoom-val{
+  min-width:52px;display:grid;place-items:center;font-size:11px;color:var(--a-dim);
+  border-radius:var(--r-sm);
+}
+.zoom-val:hover{background:var(--a-lift);color:var(--a-text);}
+.minimap{
+  position:absolute;right:16px;bottom:16px;width:186px;height:118px;z-index:12;
+  border-radius:var(--r-md);overflow:hidden;
+  background:rgba(12,11,18,.82);backdrop-filter:blur(18px);
+  border:1px solid var(--a-line-hi);box-shadow:var(--sh-2);
+}
+.mm-node{position:absolute;border-radius:2px;opacity:.72;}
+.mm-view{position:absolute;border:1.5px solid var(--a-accent-hi);border-radius:4px;background:rgba(124,92,255,.1);pointer-events:none;}
+.marquee{
+  position:absolute;border:1px solid var(--a-accent-hi);background:rgba(124,92,255,.12);
+  border-radius:4px;pointer-events:none;z-index:8;
+}
+.hint{
+  position:absolute;left:16px;top:14px;z-index:12;display:flex;gap:14px;
+  font-size:10.5px;color:var(--a-faint);
+}
+.hint b{color:var(--a-dim);font-weight:530;}
+
+/* ---- Inspector ---- */
+.inspector{
+  width:322px;flex:none;display:flex;flex-direction:column;min-height:0;
+  border-left:1px solid var(--a-line);background:var(--a-base);
+}
+.insp-head{padding:14px 16px 0;flex:none;}
+.insp-title{display:flex;align-items:center;gap:10px;}
+.insp-title .n-icon{width:30px;height:30px;border-radius:9px;}
+.insp-title b{font-size:13.5px;font-weight:580;letter-spacing:-.01em;display:block;}
+.insp-title span{font-size:10.5px;color:var(--a-faint);}
+.tabs{display:flex;gap:2px;margin-top:14px;border-bottom:1px solid var(--a-line);}
+.tab{
+  padding:8px 11px;font-size:12px;color:var(--a-faint);position:relative;
+  transition:color .14s;font-weight:520;
+}
+.tab:hover{color:var(--a-dim);}
+.tab[aria-selected="true"]{color:var(--a-text);}
+.tab[aria-selected="true"]::after{
+  content:"";position:absolute;left:8px;right:8px;bottom:-1px;height:1.5px;
+  background:var(--a-accent);border-radius:2px;
+}
+.insp-body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:15px;}
+.field{display:flex;flex-direction:column;gap:6px;}
+.field > label{font-size:11px;color:var(--a-dim);font-weight:530;display:flex;align-items:center;gap:6px;}
+.field .help{font-size:10.5px;color:var(--a-faint);line-height:1.5;}
+.inp{
+  height:34px;padding:0 11px;border-radius:var(--r-sm);
+  background:var(--a-rise);border:1px solid var(--a-line-hi);color:var(--a-text);
+  font:inherit;font-size:12.5px;width:100%;outline:none;
+  transition:border-color .16s,background .16s;
+}
+.inp:hover{background:var(--a-lift);}
+.inp:focus{border-color:var(--a-accent);box-shadow:0 0 0 3px rgba(124,92,255,.16);}
+select.inp{appearance:none;cursor:pointer;
+  background-image:linear-gradient(45deg,transparent 50%,var(--a-faint) 50%),linear-gradient(135deg,var(--a-faint) 50%,transparent 50%);
+  background-position:calc(100% - 15px) 15px,calc(100% - 10px) 15px;
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat;}
+.env-tag{
+  display:inline-flex;align-items:center;gap:5px;font-size:10px;
+  color:var(--n-trigger);background:rgba(61,214,140,.1);
+  padding:1.5px 6px;border-radius:5px;border:1px solid rgba(61,214,140,.2);
+}
+.row-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.divider{height:1px;background:var(--a-line);margin:1px 0;}
+.sec-label{font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--a-faint);font-weight:600;}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.switch{
+  width:34px;height:20px;border-radius:var(--r-pill);background:var(--a-lift);
+  border:1px solid var(--a-line-hi);position:relative;flex:none;transition:background .18s;
+}
+.switch i{
+  position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+  background:var(--a-dim);transition:transform .18s cubic-bezier(.32,.72,0,1),background .18s;
+}
+.switch[aria-checked="true"]{background:var(--a-accent);border-color:transparent;}
+.switch[aria-checked="true"] i{transform:translateX(14px);background:#fff;}
+.out-card{
+  border:1px solid var(--a-line);border-radius:var(--r-sm);overflow:hidden;background:var(--a-sunk);
+}
+.out-card header{
+  padding:7px 11px;font-size:10.5px;color:var(--a-faint);
+  border-bottom:1px solid var(--a-line);display:flex;align-items:center;gap:7px;
+}
+.out-card pre{margin:0;padding:11px;font-size:11px;line-height:1.65;color:var(--a-dim);overflow-x:auto;}
+.out-card .k{color:var(--n-media);}
+.out-card .s{color:var(--n-trigger);}
+.out-card .n{color:var(--n-upload);}
+.empty{
+  display:flex;flex-direction:column;align-items:center;gap:9px;
+  padding:44px 20px;text-align:center;color:var(--a-faint);font-size:12px;
+}
+
+/* ---- Console ---- */
+.console{
+  flex:none;border-top:1px solid var(--a-line);background:var(--a-sunk);
+  display:flex;flex-direction:column;height:194px;
+  transition:height .26s cubic-bezier(.32,.72,0,1);
+}
+.console[data-collapsed="1"]{height:38px;}
+.con-head{
+  height:38px;flex:none;display:flex;align-items:center;gap:12px;padding:0 14px;
+  border-bottom:1px solid var(--a-line);
+}
+.con-head h4{margin:0;font-size:11.5px;font-weight:580;letter-spacing:-.005em;}
+.con-stat{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--a-faint);}
+.con-stat b{color:var(--a-dim);font-weight:530;}
+.prog{width:132px;height:4px;border-radius:3px;background:rgba(255,255,255,.07);overflow:hidden;}
+.prog i{display:block;height:100%;width:0;border-radius:3px;background:var(--a-accent);transition:width .35s cubic-bezier(.32,.72,0,1);}
+.con-body{flex:1;overflow-y:auto;padding:9px 14px 12px;font-size:11.5px;line-height:1.75;}
+.con-body[hidden]{display:none;}
+.log{display:flex;gap:11px;white-space:pre-wrap;word-break:break-word;}
+.log time{color:#4E4A62;flex:none;}
+.log .lv{flex:none;width:52px;font-weight:600;}
+.log .lv.i{color:var(--n-media);}
+.log .lv.ok{color:var(--ok);}
+.log .lv.w{color:var(--warn);}
+.log .lv.e{color:var(--err);}
+.log .src{color:var(--a-accent-hi);flex:none;}
+.log .msg{color:var(--a-dim);}
+.log .msg em{font-style:normal;color:var(--a-text);}
+
+/* ============================================================
+   SPEC SECTIONS
+   ============================================================ */
+.spec{padding:96px 0 40px;}
+.sec{margin-bottom:80px;}
+.sec-head{
+  display:flex;align-items:baseline;gap:14px;margin-bottom:26px;
+  padding-bottom:14px;border-bottom:1px solid var(--p-line);
+}
+.sec-head h2{margin:0;font-size:24px;font-weight:640;letter-spacing:-.026em;}
+.sec-head p{margin:0;color:var(--p-faint);font-size:13px;}
+.grid{display:grid;gap:16px;}
+.g-4{grid-template-columns:repeat(4,1fr);}
+.g-3{grid-template-columns:repeat(3,1fr);}
+.g-2{grid-template-columns:repeat(2,1fr);}
+.card{
+  background:var(--p-surface);border:1px solid var(--p-line);border-radius:var(--r-md);
+  padding:20px;box-shadow:var(--p-shadow);
+}
+.card h3{margin:0 0 4px;font-size:14px;font-weight:600;letter-spacing:-.012em;}
+.card > p{margin:0 0 14px;font-size:12.5px;color:var(--p-faint);line-height:1.55;}
+
+/* swatches */
+.sw{border-radius:12px;overflow:hidden;border:1px solid var(--p-line);}
+.sw-c{height:76px;}
+.sw-m{padding:10px 12px;background:var(--p-surface);}
+.sw-m b{display:block;font-size:12px;font-weight:560;}
+.sw-m span{display:block;font-size:11px;color:var(--p-faint);margin-top:1px;}
+
+/* type scale */
+.type-row{
+  display:flex;align-items:baseline;gap:20px;padding:13px 0;
+  border-bottom:1px dashed var(--p-line-soft);
+}
+.type-row:last-child{border-bottom:0;}
+.type-row .t-name{width:112px;flex:none;font-size:11px;color:var(--p-faint);}
+.type-row .t-spec{margin-left:auto;font-size:11px;color:var(--p-faint);flex:none;}
+.type-row .t-demo{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--p-text);}
+
+/* spacing */
+.sp-row{display:flex;align-items:center;gap:14px;padding:7px 0;}
+.sp-row .s-n{width:56px;flex:none;font-size:11.5px;color:var(--p-faint);}
+.sp-row .s-b{height:11px;border-radius:3px;background:var(--p-accent);opacity:.85;}
+.sp-row .s-u{font-size:11px;color:var(--p-faint);}
+
+/* node catalogue */
+.cat{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:9px;}
+.cat-i{
+  display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;
+  border:1px solid var(--p-line);background:var(--p-surface);
+  transition:transform .16s,border-color .16s,box-shadow .16s;
+}
+.cat-i:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--c) 45%,var(--p-line));box-shadow:var(--p-shadow);}
+.cat-ic{
+  width:28px;height:28px;border-radius:9px;flex:none;display:grid;place-items:center;
+  background:color-mix(in srgb,var(--c) 15%,transparent);color:var(--c);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 28%,transparent);
+}
+.cat-t b{display:block;font-size:12.5px;font-weight:550;letter-spacing:-.008em;}
+.cat-t span{display:block;font-size:10.5px;color:var(--p-faint);}
+
+/* tables */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--p-line);border-radius:var(--r-md);background:var(--p-surface);}
+table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:560px;}
+th,td{text-align:left;padding:11px 15px;border-bottom:1px solid var(--p-line-soft);vertical-align:top;}
+th{
+  font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--p-faint);
+  font-weight:600;background:var(--p-bg);position:sticky;top:0;
+}
+tr:last-child td{border-bottom:0;}
+td code{
+  font-size:11.5px;background:var(--p-accent-soft);color:var(--p-accent);
+  padding:1.5px 6px;border-radius:5px;white-space:nowrap;
+}
+td.dim{color:var(--p-dim);}
+
+/* code block */
+.code{
+  background:#0C0B12;border:1px solid #221F2E;border-radius:var(--r-md);
+  padding:18px;overflow-x:auto;font-size:12px;line-height:1.75;color:#9C97B4;
+  margin:0;
+}
+.code .c{color:#5A5670;}
+.code .k{color:#8B7BFF;}
+.code .s{color:#3DD68C;}
+.code .p{color:#4CA6FF;}
+
+/* responsive strip */
+.bp{display:flex;flex-direction:column;gap:11px;}
+.bp-i{display:flex;gap:14px;align-items:flex-start;padding:13px 0;border-bottom:1px dashed var(--p-line-soft);}
+.bp-i:last-child{border-bottom:0;}
+.bp-w{
+  flex:none;width:104px;font-size:11.5px;color:var(--p-accent);font-weight:560;
+}
+.bp-d{font-size:12.5px;color:var(--p-dim);line-height:1.6;}
+.bp-d b{color:var(--p-text);font-weight:560;}
+
+.foot{
+  padding:40px 0 80px;border-top:1px solid var(--p-line);margin-top:20px;
+  color:var(--p-faint);font-size:12px;display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;
+}
+
+/* ============================================================
+   RESPONSIVE — the mockup degrades the way the real app should
+   ============================================================ */
+@media (max-width:1400px){
+  .app{height:760px;}
+  .minimap{display:none;}
+  .inspector{width:288px;}
+}
+@media (max-width:1180px){
+  .g-4{grid-template-columns:repeat(2,1fr);}
+  .sidebar{width:60px;}
+  .app .brand-txt,.app .nav-i span,.app .nav-count,.app .nav-sec,.app .side-foot .who{opacity:0;pointer-events:none;}
+  .tb-search{width:130px;}
+  .hint{display:none;}
+}
+@media (max-width:900px){
+  .wrap{padding:0 16px;}
+  .masthead{padding:48px 0 28px;}
+  .g-4,.g-3,.g-2{grid-template-columns:1fr;}
+  .inspector{position:absolute;right:0;top:0;bottom:0;z-index:30;box-shadow:var(--sh-3);}
+  .app{height:640px;}
+  .spec{padding:64px 0 24px;}
+  .sec{margin-bottom:56px;}
+  .btn .lbl{display:none;}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important;}
+}
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Product design specification</p>
+    <h1>Yu-tomation <em>— the workflow builder for AI video production.</em></h1>
+    <p class="lede">
+      A node canvas built for one job: turning a topic into a finished short-form video, without
+      babysitting the pipeline. This page is the working interface — pan it, drag nodes, select
+      them, run the workflow — followed by the system underneath it.
+    </p>
+    <div class="meta-row">
+      <span class="chip"><span class="dot" style="color:#7C5CFF"></span><b>Dark-first</b> editor</span>
+      <span class="chip"><b>19</b> node types</span>
+      <span class="chip"><b>Next.js</b> · React · Tailwind · shadcn/ui · Framer Motion</span>
+      <span class="chip">Try it: <b>drag</b> to pan · <b>scroll</b> to zoom · <b>Run</b></span>
+    </div>
+  </header>
+
+  <!-- ==========================================================
+       THE EDITOR
+       ========================================================== -->
+  <section class="app" id="app" data-rail="0" aria-label="Yu-tomation editor">
+
+    <div class="topbar">
+      <button class="rail-btn" id="railBtn" style="width:32px" title="Collapse sidebar" aria-label="Collapse sidebar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M9 4v16"/></svg>
+      </button>
+      <input class="wf-name" id="wfName" value="Short — Google Search Engine" aria-label="Workflow name" spellcheck="false">
+      <button class="status-pill" id="statePill" data-state="draft">
+        <span class="dot"></span><span id="stateTxt">Draft</span>
+      </button>
+
+      <div class="spacer"></div>
+
+      <label class="tb-search">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input placeholder="Search nodes" aria-label="Search nodes">
+        <kbd>⌘K</kbd>
+      </label>
+
+      <button class="btn btn-ghost" title="Version history">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 4v4h4"/><path d="M12 8v4l3 2"/></svg>
+        <span class="lbl">History</span>
+      </button>
+      <button class="btn" id="saveBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+        <span class="lbl">Save</span>
+      </button>
+      <button class="btn btn-run" id="runBtn">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>
+        <span class="lbl">Run</span>
+      </button>
+      <button class="btn" id="pubBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+        <span class="lbl">Publish</span>
+      </button>
+      <div class="avatar" title="Yusuf Fauziyan">YF</div>
+    </div>
+
+    <div class="app-body">
+
+      <!-- SIDEBAR -->
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="mark">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h6l4 10h6"/><circle cx="4" cy="7" r="2" fill="#fff" stroke="none"/><circle cx="20" cy="17" r="2" fill="#fff" stroke="none"/></svg>
+          </div>
+          <div class="brand-txt"><b>Yu-tomation</b><span>Studio workspace</span></div>
+        </div>
+
+        <nav class="nav">
+          <a class="nav-i" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Dashboard</span></a>
+          <a class="nav-i" href="#" aria-current="page"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="12" r="2.5"/><circle cx="5" cy="18" r="2.5"/><path d="M7.5 6h5a4 4 0 0 1 4 4v.5M7.5 18h5a4 4 0 0 0 4-4v-.5"/></svg><span>Workflows</span><span class="nav-count">7</span></a>
+          <a class="nav-i" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9"/><path d="M3 4v5h5"/><path d="m12 8 v4 l3 2"/></svg><span>Executions</span><span class="nav-count">142</span></a>
+          <a class="nav-i" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M8 3v4M16 3v4M3 10h18"/></svg><span>Schedules</span><span class="nav-count">2</span></a>
+          <a class="nav-i" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z"/><path d="m12 12 8-4.5M12 12v9M12 12 4 7.5"/></svg><span>Templates</span></a>
+          <a class="nav-i" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="12" r="4"/><path d="M12 12h9M17 12v3.5M20 12v2.5"/></svg><span>Credentials</span></a>
+
+          <div class="nav-sec">Workspace</div>
+          <a class="nav-i" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7 19.4a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H1a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 2.6 7a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V1a2 2 0 1 1 4 0v.1A1.7 1.7 0 0 0 17 2.6a1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H23a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1.5z" transform="translate(0.5,0.5) scale(0.92)"/></svg><span>Settings</span></a>
+          <a class="nav-i" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 0 1 4.8.8c0 1.7-2.4 2-2.4 3.5"/><path d="M12 17.2h.01"/></svg><span>Help</span></a>
+        </nav>
+
+        <div class="side-foot">
+          <div class="who">
+            <div class="avatar" style="width:26px;height:26px;font-size:10px">YF</div>
+            <div style="min-width:0"><b>Yusuf Fauziyan</b><span>Pro workspace</span></div>
+          </div>
+          <a class="nav-i" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15 17l5-5-5-5"/><path d="M20 12H9"/><path d="M9 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/></svg><span>Log out</span></a>
+        </div>
+      </aside>
+
+      <!-- CANVAS -->
+      <main class="stage">
+        <div class="canvas" id="canvas">
+          <div class="grid" id="gridBg"></div>
+          <div id="world">
+            <svg id="edges"><g id="edgeG"></g></svg>
+            <div id="nodes"></div>
+          </div>
+          <div class="vignette"></div>
+
+          <div class="hint">
+            <span><b>Drag</b> pan</span><span><b>Scroll</b> zoom</span>
+            <span><b>Shift-drag</b> marquee</span><span><b>Shift-click</b> multi-select</span>
+          </div>
+
+          <div class="canvas-tools">
+            <button class="tool" id="zOut" title="Zoom out" aria-label="Zoom out"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
+            <button class="zoom-val num" id="zVal" title="Reset zoom">100%</button>
+            <button class="tool" id="zIn" title="Zoom in" aria-label="Zoom in"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+            <button class="tool" id="zFit" title="Fit to view" aria-label="Fit to view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15"/></svg></button>
+          </div>
+
+          <div class="minimap" id="minimap" title="Minimap"></div>
+        </div>
+
+        <!-- CONSOLE -->
+        <section class="console" id="console" data-collapsed="0" aria-label="Execution console">
+          <header class="con-head">
+            <button class="tool" id="conToggle" style="width:22px;height:22px" aria-label="Collapse console">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" id="conChev"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <h4>Execution console</h4>
+            <span class="con-stat">Node <b id="curNode">—</b></span>
+            <span class="con-stat">Elapsed <b class="num" id="elapsed">0.0s</b></span>
+            <div class="spacer"></div>
+            <span class="con-stat num" id="progTxt">0 / 12</span>
+            <div class="prog"><i id="progBar"></i></div>
+            <button class="btn btn-ghost" id="clearBtn" style="height:26px;font-size:11.5px">Clear</button>
+          </header>
+          <div class="con-body mono" id="conBody"></div>
+        </section>
+      </main>
+
+      <!-- INSPECTOR -->
+      <aside class="inspector" id="inspector">
+        <div class="insp-head">
+          <div class="insp-title">
+            <div class="n-icon" id="iIcon" style="--c:var(--n-media)"></div>
+            <div style="min-width:0">
+              <b id="iTitle">Image Generation</b>
+              <span id="iSub">ImageAgent · media</span>
+            </div>
+          </div>
+          <div class="tabs" role="tablist">
+            <button class="tab" role="tab" aria-selected="true" data-tab="params">Parameters</button>
+            <button class="tab" role="tab" aria-selected="false" data-tab="adv">Advanced</button>
+            <button class="tab" role="tab" aria-selected="false" data-tab="logs">Logs</button>
+            <button class="tab" role="tab" aria-selected="false" data-tab="out">Output</button>
+          </div>
+        </div>
+        <div class="insp-body" id="inspBody"></div>
+      </aside>
+
+    </div>
+  </section>
+
+  <!-- ==========================================================
+       SPEC
+       ========================================================== -->
+  <div class="spec">
+
+    <!-- COLOR -->
+    <section class="sec">
+      <div class="sec-head">
+        <h2>Color</h2>
+        <p>Neutrals carry a violet bias, so the accent reads as part of the surface rather than dropped on top of grey.</p>
+      </div>
+
+      <p class="sec-label" style="margin:0 0 12px">Editor surfaces — fixed dark</p>
+      <div class="grid g-4" style="margin-bottom:28px">
+        <div class="sw"><div class="sw-c" style="background:#08070C"></div><div class="sw-m"><b>Void</b><span class="mono">#08070C · canvas ground</span></div></div>
+        <div class="sw"><div class="sw-c" style="background:#110F19"></div><div class="sw-m"><b>Base</b><span class="mono">#110F19 · panels</span></div></div>
+        <div class="sw"><div class="sw-c" style="background:#181622"></div><div class="sw-m"><b>Rise</b><span class="mono">#181622 · cards, inputs</span></div></div>
+        <div class="sw"><div class="sw-c" style="background:#1F1C2B"></div><div class="sw-m"><b>Lift</b><span class="mono">#1F1C2B · hover</span></div></div>
+      </div>
+
+      <p class="sec-label" style="margin:0 0 12px">Accent &amp; text</p>
+      <div class="grid g-4" style="margin-bottom:28px">
+        <div class="sw"><div class="sw-c" style="background:#7C5CFF"></div><div class="sw-m"><b>Accent</b><span class="mono">#7C5CFF · primary action</span></div></div>
+        <div class="sw"><div class="sw-c" style="background:#A594FF"></div><div class="sw-m"><b>Accent hover</b><span class="mono">#A594FF</span></div></div>
+        <div class="sw"><div class="sw-c" style="background:#F0EEF8"></div><div class="sw-m"><b>Text</b><span class="mono">#F0EEF8 · 15.8:1</span></div></div>
+        <div class="sw"><div class="sw-c" style="background:#9C97B4"></div><div class="sw-m"><b>Text dim</b><span class="mono">#9C97B4 · 6.4:1</span></div></div>
+      </div>
+
+      <p class="sec-label" style="margin:0 0 12px">Node categories — one family, matched chroma</p>
+      <div class="grid g-3">
+        <div class="sw"><div class="sw-c" style="background:#3DD68C"></div><div class="sw-m"><b>Trigger</b><span class="mono">#3DD68C</span></div></div>
+        <div class="sw"><div class="sw-c" style="background:#8B7BFF"></div><div class="sw-m"><b>AI</b><span class="mono">#8B7BFF</span></div></div>
+        <div class="sw"><div class="sw-c" style="background:#4CA6FF"></div><div class="sw-m"><b>Media</b><span class="mono">#4CA6FF</span></div></div>
+        <div class="sw"><div class="sw-c" style="background:#FF6B6B"></div><div class="sw-m"><b>Video</b><span class="mono">#FF6B6B</span></div></div>
+        <div class="sw"><div class="sw-c" style="background:#FF7AC6"></div><div class="sw-m"><b>Upload</b><span class="mono">#FF7AC6</span></div></div>
+        <div class="sw"><div class="sw-c" style="background:#FFA24C"></div><div class="sw-m"><b>Logic</b><span class="mono">#FFA24C</span></div></div>
+      </div>
+
+      <div class="card" style="margin-top:20px">
+        <h3>Semantic color stays separate from category color</h3>
+        <p style="margin:0">
+          A node's hue says <em>what kind of step it is</em>; its status pill says <em>how the run went</em>.
+          Success reuses the trigger green and failure the video red — but only inside status pills, never as
+          a card accent, so a red <em>Video Rendering</em> node is never mistaken for a failed one.
+        </p>
+      </div>
+    </section>
+
+    <!-- TYPE -->
+    <section class="sec">
+      <div class="sec-head">
+        <h2>Typography</h2>
+        <p>Two roles. The interface face stays quiet; the mono face does the talking wherever the data is machine-shaped.</p>
+      </div>
+      <div class="card">
+        <div class="type-row"><span class="t-name">Display / H1</span><span class="t-demo" style="font-size:30px;font-weight:680;letter-spacing:-.035em">Workflow builder</span><span class="t-spec mono">30 / 1.02 / −3.5%</span></div>
+        <div class="type-row"><span class="t-name">Section / H2</span><span class="t-demo" style="font-size:22px;font-weight:640;letter-spacing:-.026em">Node inspector</span><span class="t-spec mono">22 / 1.15 / −2.6%</span></div>
+        <div class="type-row"><span class="t-name">Node title</span><span class="t-demo" style="font-size:13px;font-weight:570;letter-spacing:-.008em">Image Generation</span><span class="t-spec mono">13 / 1.3 / −0.8%</span></div>
+        <div class="type-row"><span class="t-name">Body</span><span class="t-demo" style="font-size:15px">Generates one image per planned scene.</span><span class="t-spec mono">15 / 1.6</span></div>
+        <div class="type-row"><span class="t-name">UI label</span><span class="t-demo" style="font-size:11px;color:var(--p-dim);font-weight:530">Image Combo</span><span class="t-spec mono">11 / 1.4 / 530</span></div>
+        <div class="type-row"><span class="t-name">Micro label</span><span class="t-demo" style="font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--p-faint);font-weight:600">Advanced</span><span class="t-spec mono">10 / +11% tracking</span></div>
+        <div class="type-row"><span class="t-name">Data / mono</span><span class="t-demo mono" style="font-size:11.5px">ag/gemini-3.1-flash-image-9x16</span><span class="t-spec mono">11.5 / 1.75</span></div>
+      </div>
+      <div class="grid g-2" style="margin-top:16px">
+        <div class="card">
+          <h3>Interface face</h3>
+          <p style="margin:0">System grotesque — SF Pro on macOS, Segoe UI on Windows, Inter as the web fallback. Chosen for legibility at 11–13px, where a display face falls apart. Character comes from tracking, not from the family.</p>
+        </div>
+        <div class="card">
+          <h3>Data face</h3>
+          <p style="margin:0">SF Mono / JetBrains Mono. Used for combos, durations, file names, logs and every token in this document. Ligatures off — <code>!=</code> should look like what you typed. Tabular numerals everywhere digits line up.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SPACING -->
+    <section class="sec">
+      <div class="sec-head">
+        <h2>Spacing &amp; radius</h2>
+        <p>A 4px base. Everything on the grid; nothing between steps.</p>
+      </div>
+      <div class="grid g-2">
+        <div class="card">
+          <h3>Scale</h3>
+          <p>Tailwind's default spacing maps 1:1 — <code>gap-4</code> is 16px.</p>
+          <div class="sp-row"><span class="s-n mono">4px</span><span class="s-b" style="width:4px"></span><span class="s-u">icon gap, pill padding</span></div>
+          <div class="sp-row"><span class="s-n mono">8px</span><span class="s-b" style="width:8px"></span><span class="s-u">control gap</span></div>
+          <div class="sp-row"><span class="s-n mono">12px</span><span class="s-b" style="width:12px"></span><span class="s-u">field gap</span></div>
+          <div class="sp-row"><span class="s-n mono">16px</span><span class="s-b" style="width:16px"></span><span class="s-u">panel padding, card padding</span></div>
+          <div class="sp-row"><span class="s-n mono">24px</span><span class="s-b" style="width:24px"></span><span class="s-u">group separation</span></div>
+          <div class="sp-row"><span class="s-n mono">40px</span><span class="s-b" style="width:40px"></span><span class="s-u">canvas node gutter</span></div>
+          <div class="sp-row"><span class="s-n mono">72px</span><span class="s-b" style="width:72px"></span><span class="s-u">section rhythm</span></div>
+        </div>
+        <div class="card">
+          <h3>Radius</h3>
+          <p>16px is the signature — nodes, panels, cards. Everything else is derived from it.</p>
+          <div class="grid g-2" style="gap:10px">
+            <div style="border:1px solid var(--p-line);border-radius:6px;padding:12px;font-size:11.5px" class="mono">6px · pills, kbd</div>
+            <div style="border:1px solid var(--p-line);border-radius:10px;padding:12px;font-size:11.5px" class="mono">10px · inputs, buttons</div>
+            <div style="border:1px solid var(--p-line);border-radius:16px;padding:12px;font-size:11.5px" class="mono">16px · nodes, cards</div>
+            <div style="border:1px solid var(--p-line);border-radius:22px;padding:12px;font-size:11.5px" class="mono">22px · app frame</div>
+          </div>
+          <h3 style="margin-top:20px">Elevation</h3>
+          <p style="margin-bottom:10px">Two layers each — a tight contact shadow plus a wide ambient one. No border and shadow doing the same job.</p>
+          <div class="grid g-3" style="gap:10px">
+            <div style="border-radius:12px;padding:16px 10px;text-align:center;font-size:11px;background:var(--p-surface);box-shadow:0 1px 2px rgba(0,0,0,.18)" class="mono">sh-1</div>
+            <div style="border-radius:12px;padding:16px 10px;text-align:center;font-size:11px;background:var(--p-surface);box-shadow:0 2px 6px rgba(0,0,0,.14),0 10px 30px -14px rgba(0,0,0,.5)" class="mono">sh-2</div>
+            <div style="border-radius:12px;padding:16px 10px;text-align:center;font-size:11px;background:var(--p-surface);box-shadow:0 4px 12px rgba(0,0,0,.16),0 24px 60px -20px rgba(0,0,0,.6)" class="mono">sh-3</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- NODES -->
+    <section class="sec">
+      <div class="sec-head">
+        <h2>Node catalogue</h2>
+        <p>19 types across six categories. Hue is the category; the icon is the specific step.</p>
+      </div>
+      <div class="cat" id="catalogue"></div>
+    </section>
+
+    <!-- ANATOMY + STATES -->
+    <section class="sec">
+      <div class="sec-head">
+        <h2>Node anatomy &amp; interaction states</h2>
+        <p>Every state is reachable by keyboard as well as pointer.</p>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>State</th><th>Trigger</th><th>Treatment</th><th>Motion</th></tr></thead>
+          <tbody>
+            <tr><td><b>Rest</b></td><td>—</td><td class="dim">Surface <code>Rise</code>, 1px border at 11% white, <code>sh-2</code></td><td class="dim">—</td></tr>
+            <tr><td><b>Hover</b></td><td>Pointer over card</td><td class="dim">Lift 2px, <code>sh-3</code>, border to 16%, ports scale 1.28× with a soft ring in category hue</td><td class="dim">160ms · <code>cubic-bezier(.32,.72,0,1)</code></td></tr>
+            <tr><td><b>Selected</b></td><td>Click / <kbd>Space</kbd></td><td class="dim">Accent border, <code>sh-glow</code> in accent at 30%, inspector binds to node</td><td class="dim">120ms fade, no movement</td></tr>
+            <tr><td><b>Multi-select</b></td><td>Shift-click, marquee</td><td class="dim">Accent-hover border on each; inspector shows the count and shared fields only</td><td class="dim">Marquee follows pointer, no easing</td></tr>
+            <tr><td><b>Dragging</b></td><td>Pointer down + move</td><td class="dim">Lift removed so the card sits under the cursor; snaps to a 20px grid; edges re-path live</td><td class="dim">None — direct manipulation must not lag</td></tr>
+            <tr><td><b>Queued</b></td><td>Run started</td><td class="dim">Status pill neutral, card unchanged</td><td class="dim">—</td></tr>
+            <tr><td><b>Running</b></td><td>Executor reaches node</td><td class="dim">Accent pill, pulsing dot, 2px progress rail along the card's lower edge</td><td class="dim">Dot pulse 1.05s ease-in-out infinite</td></tr>
+            <tr><td><b>Succeeded</b></td><td>Step returns ok</td><td class="dim">Green pill, execution time replaces the estimate</td><td class="dim">Pill cross-fades 200ms</td></tr>
+            <tr><td><b>Failed</b></td><td>Typed error surfaces</td><td class="dim">Red pill, error code inline, inspector jumps to <b>Logs</b></td><td class="dim">One 220ms shake, 3px amplitude — never repeated</td></tr>
+            <tr><td><b>Disabled</b></td><td>Node muted</td><td class="dim">45% opacity, dashed border, edges drawn at 30%</td><td class="dim">—</td></tr>
+            <tr><td><b>Focus (kbd)</b></td><td><kbd>Tab</kbd></td><td class="dim">2px accent ring, 2px offset — visible on the canvas ground, not only on the card</td><td class="dim">None</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- MOTION -->
+    <section class="sec">
+      <div class="sec-head">
+        <h2>Motion</h2>
+        <p>One easing curve for movement, one for opacity. Everything under 260ms — this is a tool, not a title sequence.</p>
+      </div>
+      <div class="grid g-2">
+        <div class="card">
+          <h3>Framer Motion presets</h3>
+          <pre class="code"><span class="c">// The house curve. Fast out, settled landing.</span>
+<span class="k">export const</span> ease = [<span class="p">0.32</span>, <span class="p">0.72</span>, <span class="p">0</span>, <span class="p">1</span>];
+
+<span class="k">export const</span> panel = {
+  initial: { x: <span class="p">18</span>, opacity: <span class="p">0</span> },
+  animate: { x: <span class="p">0</span>,  opacity: <span class="p">1</span> },
+  exit:    { x: <span class="p">18</span>, opacity: <span class="p">0</span> },
+  transition: { duration: <span class="p">0.24</span>, ease },
+};
+
+<span class="k">export const</span> node = {
+  whileHover: { y: <span class="p">-2</span>, transition: { duration: <span class="p">0.16</span>, ease } },
+  whileTap:   { scale: <span class="p">0.994</span> },
+};
+
+<span class="c">// Console lines stream in; stagger keeps them readable.</span>
+<span class="k">export const</span> logLine = {
+  initial: { opacity: <span class="p">0</span>, y: <span class="p">4</span> },
+  animate: { opacity: <span class="p">1</span>, y: <span class="p">0</span> },
+  transition: { duration: <span class="p">0.14</span> },
+};</pre>
+        </div>
+        <div class="card">
+          <h3>Rules</h3>
+          <p style="margin-bottom:14px">Motion earns its place by explaining a change of state. If it only decorates, cut it.</p>
+          <div class="bp">
+            <div class="bp-i"><span class="bp-w mono">120ms</span><span class="bp-d"><b>Colour and opacity.</b> Hover tints, pill cross-fades, focus rings.</span></div>
+            <div class="bp-i"><span class="bp-w mono">160ms</span><span class="bp-d"><b>Small movement.</b> Node lift, port scale, button press.</span></div>
+            <div class="bp-i"><span class="bp-w mono">240ms</span><span class="bp-d"><b>Layout.</b> Sidebar collapse, inspector slide, console expand.</span></div>
+            <div class="bp-i"><span class="bp-w mono">Never</span><span class="bp-d"><b>Direct manipulation.</b> Dragging, panning and zooming are 1:1 with the pointer. Any easing here reads as lag.</span></div>
+            <div class="bp-i"><span class="bp-w mono">Reduced</span><span class="bp-d"><b><code>prefers-reduced-motion</code></b> collapses every duration to ~0 and removes the running-dot pulse. State stays legible through colour and text alone.</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RESPONSIVE -->
+    <section class="sec">
+      <div class="sec-head">
+        <h2>Responsive behaviour</h2>
+        <p>The canvas is the last thing to give up space.</p>
+      </div>
+      <div class="card">
+        <div class="bp">
+          <div class="bp-i"><span class="bp-w mono">≥ 1600</span><span class="bp-d"><b>Full desk.</b> 224px sidebar · fluid canvas · 322px inspector · minimap · 194px console. The reference layout.</span></div>
+          <div class="bp-i"><span class="bp-w mono">1400–1600</span><span class="bp-d"><b>Comfortable.</b> Inspector narrows to 288px. Everything else holds.</span></div>
+          <div class="bp-i"><span class="bp-w mono">1180–1400</span><span class="bp-d"><b>Tight.</b> Minimap hides — it is the least load-bearing element on the canvas. Console drops to 160px.</span></div>
+          <div class="bp-i"><span class="bp-w mono">900–1180</span><span class="bp-d"><b>Laptop.</b> Sidebar auto-collapses to the 60px icon rail; labels return on hover as tooltips. Top-bar search shrinks; button labels stay.</span></div>
+          <div class="bp-i"><span class="bp-w mono">640–900</span><span class="bp-d"><b>Tablet.</b> Inspector becomes an overlay drawer over the canvas, dismissed by tapping the ground. Button labels drop to icons. Console collapses to its header, expandable as a sheet.</span></div>
+          <div class="bp-i"><span class="bp-w mono">&lt; 640</span><span class="bp-d"><b>Phone — read, don't author.</b> Canvas is pinch-zoom and pan only; node dragging is disabled because a 44px touch target cannot hit an 11px port reliably. Run, watch the console, inspect a node in a bottom sheet. Editing sends you to a larger screen, and says so.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TOKENS -->
+    <section class="sec">
+      <div class="sec-head">
+        <h2>Design tokens</h2>
+        <p>Drop-in for <code>tailwind.config.ts</code> and <code>globals.css</code>. shadcn/ui's variable contract is satisfied by the same set.</p>
+      </div>
+      <div class="grid g-2">
+        <div class="card">
+          <h3>globals.css</h3>
+          <pre class="code"><span class="c">/* shadcn/ui contract + Yu-tomation additions */</span>
+<span class="k">@layer</span> base {
+  :root {
+    --background: <span class="p">252 30% 4%</span>;    <span class="c">/* void  */</span>
+    --foreground: <span class="p">255 40% 95%</span>;
+    --card: <span class="p">255 22% 8%</span>;          <span class="c">/* base  */</span>
+    --popover: <span class="p">255 20% 11%</span>;       <span class="c">/* rise  */</span>
+    --primary: <span class="p">252 100% 68%</span>;      <span class="c">/* #7C5CFF */</span>
+    --primary-foreground: <span class="p">0 0% 100%</span>;
+    --muted: <span class="p">255 20% 11%</span>;
+    --muted-foreground: <span class="p">255 12% 65%</span>;
+    --border: <span class="p">0 0% 100% / 6%</span>;
+    --ring: <span class="p">252 100% 68%</span>;
+    --radius: <span class="p">1rem</span>;               <span class="c">/* 16px signature */</span>
+
+    <span class="c">/* node categories */</span>
+    --node-trigger: <span class="p">154 66% 54%</span>;
+    --node-ai:      <span class="p">248 100% 74%</span>;
+    --node-media:   <span class="p">209 100% 65%</span>;
+    --node-video:   <span class="p">0 100% 71%</span>;
+    --node-upload:  <span class="p">324 100% 74%</span>;
+    --node-logic:   <span class="p">30 100% 65%</span>;
+  }
+}</pre>
+        </div>
+        <div class="card">
+          <h3>tailwind.config.ts</h3>
+          <pre class="code"><span class="k">export default</span> {
+  theme: {
+    extend: {
+      colors: {
+        node: {
+          trigger: <span class="s">"hsl(var(--node-trigger))"</span>,
+          ai:      <span class="s">"hsl(var(--node-ai))"</span>,
+          media:   <span class="s">"hsl(var(--node-media))"</span>,
+          video:   <span class="s">"hsl(var(--node-video))"</span>,
+          upload:  <span class="s">"hsl(var(--node-upload))"</span>,
+          logic:   <span class="s">"hsl(var(--node-logic))"</span>,
+        },
+      },
+      borderRadius: {
+        lg: <span class="s">"var(--radius)"</span>,           <span class="c">/* 16 */</span>
+        md: <span class="s">"calc(var(--radius) - 6px)"</span>, <span class="c">/* 10 */</span>
+        sm: <span class="s">"calc(var(--radius) - 10px)"</span>,<span class="c">/* 6  */</span>
+      },
+      boxShadow: {
+        node:  <span class="s">"0 2px 6px rgb(0 0 0/.4), 0 10px 30px -14px rgb(0 0 0/.8)"</span>,
+        lifted:<span class="s">"0 4px 12px rgb(0 0 0/.45), 0 24px 60px -20px rgb(0 0 0/.9)"</span>,
+        glow:  <span class="s">"0 0 0 1px hsl(var(--ring)/.3), 0 10px 40px -12px hsl(var(--ring)/.3)"</span>,
+      },
+      transitionTimingFunction: {
+        house: <span class="s">"cubic-bezier(.32,.72,0,1)"</span>,
+      },
+    },
+  },
+};</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- COMPONENTS -->
+    <section class="sec">
+      <div class="sec-head">
+        <h2>Component hierarchy</h2>
+        <p>What to build, and which shadcn primitive it starts from.</p>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th style="width:30%">Component</th><th style="width:26%">Built on</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><code>&lt;AppShell&gt;</code></td><td class="dim">CSS grid</td><td class="dim">Owns the three columns and the console row. The only component that knows the breakpoints.</td></tr>
+            <tr><td><code>&lt;Sidebar&gt;</code></td><td class="dim"><code>Tooltip</code>, <code>ScrollArea</code></td><td class="dim">Collapsed state persists to <code>localStorage</code>. Labels become tooltips on the rail.</td></tr>
+            <tr><td><code>&lt;TopBar&gt;</code></td><td class="dim"><code>Input</code>, <code>Button</code>, <code>DropdownMenu</code>, <code>Badge</code></td><td class="dim">Workflow name is an inline contenteditable input — commits on blur and <kbd>Enter</kbd>, reverts on <kbd>Esc</kbd>.</td></tr>
+            <tr><td><code>&lt;Canvas&gt;</code></td><td class="dim">React Flow (headless) or custom</td><td class="dim">Owns pan, zoom, marquee, snapping. Renders edges into one SVG layer beneath the node layer.</td></tr>
+            <tr><td><code>&lt;WorkflowNode&gt;</code></td><td class="dim"><code>Card</code>, <code>Badge</code>, <code>Progress</code></td><td class="dim">Pure presentation. Takes <code>{ kind, status, durationMs, selected }</code> and nothing else.</td></tr>
+            <tr><td><code>&lt;NodePort&gt;</code></td><td class="dim">—</td><td class="dim">Hit area is 24px even though the dot is 11px. Never shrink the target to match the paint.</td></tr>
+            <tr><td><code>&lt;Inspector&gt;</code></td><td class="dim"><code>Tabs</code>, <code>Form</code>, <code>Select</code>, <code>Switch</code></td><td class="dim">Fields come from a per-node schema, so a new node type ships its own panel without touching this file.</td></tr>
+            <tr><td><code>&lt;ExecutionConsole&gt;</code></td><td class="dim"><code>Collapsible</code>, <code>ScrollArea</code>, <code>Progress</code></td><td class="dim">Virtualised past 500 lines. Auto-scroll pauses the moment the user scrolls up, and says so.</td></tr>
+            <tr><td><code>&lt;MiniMap&gt;</code></td><td class="dim">Canvas 2D</td><td class="dim">Redrawn on transform change only, not per frame.</td></tr>
+            <tr><td><code>&lt;CommandPalette&gt;</code></td><td class="dim"><code>Command</code> (cmdk)</td><td class="dim"><kbd>⌘K</kbd> — add node, jump to node, run, publish.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- INSPECTOR SCHEMA -->
+    <section class="sec">
+      <div class="sec-head">
+        <h2>Inspector schema</h2>
+        <p>Two node types in full, as specified. Select them on the canvas above to see these panels live.</p>
+      </div>
+      <div class="grid g-2">
+        <div class="card">
+          <h3 style="display:flex;align-items:center;gap:9px"><span class="cat-ic" style="--c:#4CA6FF;width:24px;height:24px;border-radius:8px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="8.5" cy="9.5" r="1.8"/><path d="m3 16 5-4 4 3 3-2 6 5"/></svg></span> Image Generation</h3>
+          <div class="tbl-wrap" style="border-radius:12px">
+            <table style="min-width:0">
+              <tbody>
+                <tr><td style="width:42%">Node Name</td><td class="dim">Image Generation</td></tr>
+                <tr><td>Provider</td><td class="dim">9 Router</td></tr>
+                <tr><td>Image Combo</td><td class="dim"><code>NINE_ROUTER_IMAGE_COMBO</code></td></tr>
+                <tr><td>Prompt Source</td><td class="dim">Scene Prompt</td></tr>
+                <tr><td>Output Folder</td><td class="dim"><code>images/</code></td></tr>
+                <tr><td>Concurrency</td><td class="dim">1 — scenes share one router quota</td></tr>
+                <tr><td>Retry</td><td class="dim">3</td></tr>
+                <tr><td>Timeout</td><td class="dim">180 000 ms</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="display:flex;align-items:center;gap:9px"><span class="cat-ic" style="--c:#4CA6FF;width:24px;height:24px;border-radius:8px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m12 9 1.3 2.7 3 .4-2.2 2 .6 2.9-2.7-1.4-2.7 1.4.6-2.9-2.2-2 3-.4z"/></svg></span> Thumbnail Generation</h3>
+          <div class="tbl-wrap" style="border-radius:12px">
+            <table style="min-width:0">
+              <tbody>
+                <tr><td style="width:42%">Provider</td><td class="dim">9 Router</td></tr>
+                <tr><td>Combo</td><td class="dim"><code>NINE_ROUTER_IMAGE_COMBO</code></td></tr>
+                <tr><td>Prompt Source</td><td class="dim">Thumbnail Prompt</td></tr>
+                <tr><td>Output Folder</td><td class="dim"><code>thumbnail/</code></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p style="margin:14px 0 0;font-size:12.5px;color:var(--p-dim);line-height:1.6">
+            Values that come from the environment render as a green <span class="env-tag" style="--c:#3DD68C">env</span> chip and are
+            read-only in the panel. The inspector shows the variable name, never the resolved secret — a screen-shared
+            canvas should never leak a key.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <footer class="foot">
+      <span>Yu-tomation — AI workflow builder · design specification</span>
+      <span class="mono">v1.0 · dark-first · 16px radius · #7C5CFF</span>
+    </footer>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------- icons ---------- */
+var I = {
+  play:'<path d="M7 4.5v15l13-7.5z" fill="currentColor" stroke="none"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  spark:'<path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/><circle cx="12" cy="12" r="3.2"/>',
+  doc:'<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
+  layers:'<path d="m12 3 8 4.5-8 4.5-8-4.5z"/><path d="m4 12.5 8 4.5 8-4.5"/><path d="m4 16.5 8 4.5 8-4.5"/>',
+  palette:'<path d="M12 3a9 9 0 1 0 0 18c1 0 1.6-.7 1.6-1.5 0-.4-.2-.8-.4-1-.3-.3-.4-.6-.4-1 0-.8.7-1.5 1.6-1.5H16a5 5 0 0 0 5-5c0-4.4-4-8-9-8z"/><circle cx="7.5" cy="11" r="1.1" fill="currentColor" stroke="none"/><circle cx="10.5" cy="7.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="8.5" r="1.1" fill="currentColor" stroke="none"/>',
+  image:'<rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="8.5" cy="9.5" r="1.8"/><path d="m3 16 5-4 4 3 3-2 6 5"/>',
+  star:'<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m12 9 1.3 2.7 3 .4-2.2 2 .6 2.9-2.7-1.4-2.7 1.4.6-2.9-2.2-2 3-.4z"/>',
+  mic:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
+  caption:'<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M7 14h4M13 14h4M7 10h10"/>',
+  film:'<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 9h18M3 15h18M8 4v16M16 4v16"/>',
+  upload:'<path d="M12 16V4M8 8l4-4 4 4"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>',
+  trash:'<path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M6 7v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7M10 11v6M14 11v6"/>',
+  branch:'<circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="12" cy="19" r="2.4"/><path d="M6 8.4V12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8.4M12 14v2.6"/>',
+  loop:'<path d="M4 9V7a3 3 0 0 1 3-3h10l-3-3M20 15v2a3 3 0 0 1-3 3H7l3 3"/><path d="M17 4l3 3-3 3M7 20l-3-3 3-3"/>',
+  delay:'<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5l3.5 2"/><path d="M12 3v1.5M12 19.5V21"/>',
+  merge:'<path d="M6 3v5a4 4 0 0 0 4 4h8"/><path d="M6 21v-5a4 4 0 0 1 4-4"/><path d="m15 9 3 3-3 3"/>',
+  hook:'<path d="M9 17a4 4 0 1 1-3.5-6"/><path d="M14.5 7.5a4 4 0 1 1 3 6.5"/><path d="M9.5 12.5 14 8"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/>',
+  code:'<path d="m9 8-5 4 5 4M15 8l5 4-5 4"/>'
+};
+function svg(p,s){return '<svg width="'+(s||17)+'" height="'+(s||17)+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">'+p+'</svg>';}
+
+/* ---------- node type catalogue ---------- */
+var CAT = {trigger:'--n-trigger',ai:'--n-ai',media:'--n-media',video:'--n-video',upload:'--n-upload',logic:'--n-logic'};
+var TYPES = [
+  {k:'manual',   t:'Manual Trigger',       s:'Start the run by hand',        c:'trigger', i:I.play},
+  {k:'schedule', t:'Schedule Trigger',     s:'Cron — every day 07:00 WIB',   c:'trigger', i:I.clock},
+  {k:'topic',    t:'Topic Generation',     s:'TopicAgent · dedupe by embedding', c:'ai', i:I.spark},
+  {k:'script',   t:'Script Generation',    s:'ScriptAgent · hook + body',    c:'ai', i:I.doc},
+  {k:'scene',    t:'Scene Planning',       s:'SceneAgent · shot list',       c:'ai', i:I.layers},
+  {k:'visual',   t:'Visual Planning',      s:'VisualPlannerAgent · briefs',  c:'ai', i:I.palette},
+  {k:'image',    t:'Image Generation',     s:'9 Router · one still per scene', c:'media', i:I.image},
+  {k:'thumb',    t:'Thumbnail Generation', s:'9 Router · cover frame',       c:'media', i:I.star},
+  {k:'voice',    t:'Narration Generation', s:'9 Router · measured per block',  c:'media', i:I.mic},
+  {k:'sub',      t:'Subtitle Generation',  s:'From the measured plan',       c:'media', i:I.caption},
+  {k:'render',   t:'Video Rendering',      s:'FFmpeg · 1080×1920 · 30fps',   c:'video', i:I.film},
+  {k:'tiktok',   t:'TikTok Upload',        s:'Publish + verify',             c:'upload', i:I.upload},
+  {k:'cleanup',  t:'Cleanup',              s:'Delete media, keep metadata',  c:'logic', i:I.trash},
+  {k:'cond',     t:'Condition',            s:'Branch on a typed result',     c:'logic', i:I.branch},
+  {k:'loop',     t:'Loop',                 s:'Iterate over scenes',          c:'logic', i:I.loop},
+  {k:'delay',    t:'Delay',                s:'Wait before continuing',       c:'logic', i:I.delay},
+  {k:'merge',    t:'Merge',                s:'Join parallel branches',       c:'logic', i:I.merge},
+  {k:'webhook',  t:'Webhook',              s:'Call an external service',     c:'logic', i:I.hook},
+  {k:'js',       t:'Custom JavaScript',    s:'Escape hatch, sandboxed',      c:'logic', i:I.code}
+];
+var TMAP = {}; TYPES.forEach(function(t){TMAP[t.k]=t;});
+
+/* ---------- the example workflow ---------- */
+var NW = 272, NH = 108, COL = 320, ROW = 240;
+function pos(r,c){return {x:40+c*COL, y:56+r*ROW};}
+var NODES = [
+  {id:'n1', k:'manual',  est:'—'},
+  {id:'n2', k:'topic',   est:'8.5s'},
+  {id:'n3', k:'script',  est:'9.5s'},
+  {id:'n4', k:'scene',   est:'15.8s'},
+  {id:'n5', k:'visual',  est:'53.0s'},
+  {id:'n6', k:'image',   est:'2m 46s'},
+  {id:'n7', k:'voice',   est:'43.4s'},
+  {id:'n8', k:'sub',     est:'0.0s'},
+  {id:'n9', k:'render',  est:'52.1s'},
+  {id:'n10',k:'thumb',   est:'11.2s'},
+  {id:'n11',k:'tiktok',  est:'18.7s'},
+  {id:'n12',k:'cleanup', est:'0.4s'}
+];
+NODES.forEach(function(n,i){var p=pos(Math.floor(i/4), i%4); n.x=p.x; n.y=p.y; n.st='idle'; n.time='';});
+var EDGES = [];
+for(var i=0;i<NODES.length-1;i++) EDGES.push([NODES[i].id, NODES[i+1].id]);
+var byId = {}; NODES.forEach(function(n){byId[n.id]=n;});
+
+/* ---------- canvas transform ---------- */
+var canvas = document.getElementById('canvas'),
+    world  = document.getElementById('world'),
+    nodeL  = document.getElementById('nodes'),
+    edgeG  = document.getElementById('edgeG'),
+    edgeSvg= document.getElementById('edges'),
+    gridBg = document.getElementById('gridBg'),
+    mini   = document.getElementById('minimap');
+var tx=40, ty=20, z=1, MINZ=.28, MAXZ=2.0;
+var WW = 40+3*COL+NW+120, WH = 56+2*ROW+NH+120;
+edgeSvg.setAttribute('width', WW); edgeSvg.setAttribute('height', WH);
+
+function applyTransform(){
+  world.style.transform = 'translate('+tx+'px,'+ty+'px) scale('+z+')';
+  var g = 22*z, o = 'rgba(255,255,255,'+(0.055+0.03*Math.min(1,z)).toFixed(3)+')';
+  gridBg.style.backgroundImage = 'radial-gradient(circle at 1px 1px, '+o+' 1px, transparent 0)';
+  gridBg.style.backgroundSize = g+'px '+g+'px';
+  gridBg.style.backgroundPosition = (tx%g)+'px '+(ty%g)+'px';
+  document.getElementById('zVal').textContent = Math.round(z*100)+'%';
+  drawMini();
+}
+
+/* ---------- render nodes ---------- */
+function nodeHTML(n){
+  var T = TMAP[n.k];
+  return '<div class="node" data-id="'+n.id+'" style="--c:var('+CAT[T.c]+');left:'+n.x+'px;top:'+n.y+'px" tabindex="0" role="button" aria-label="'+T.t+'">'
+    + '<span class="port in"></span><span class="port out"></span>'
+    + '<div class="node-top"><div class="n-icon">'+svg(T.i,17)+'</div>'
+    + '<div class="n-txt"><div class="n-title">'+T.t+'</div><div class="n-sub">'+T.s+'</div></div></div>'
+    + '<div class="n-foot"><span class="n-state" data-s="idle"><span class="dot"></span><span class="lbl">Idle</span></span>'
+    + '<span class="n-time num"></span></div>'
+    + '<span class="n-bar"><i></i></span></div>';
+}
+nodeL.innerHTML = NODES.map(nodeHTML).join('');
+function el(id){return nodeL.querySelector('[data-id="'+id+'"]');}
+
+/* ---------- edges ---------- */
+/* Forward hops get one clean cubic. A hop back to the start of the next
+   row sweeps out right, crosses at the midline and comes back in — the
+   ports stay on their correct sides and the curve reads as one motion. */
+function simplePath(a,b){
+  var x1=a.x+NW, y1=a.y+32, x2=b.x, y2=b.y+32, dx=x2-x1;
+  if(dx>=0){var d=Math.max(70,dx*0.5);return 'M'+x1+','+y1+'C'+(x1+d)+','+y1+' '+(x2-d)+','+y2+' '+x2+','+y2;}
+  var out=x1+170, back=x2-170, mid=(y1+y2)/2;
+  return 'M'+x1+','+y1+'C'+out+','+y1+' '+out+','+mid+' '+((out+back)/2)+','+mid
+       + 'C'+back+','+mid+' '+back+','+y2+' '+x2+','+y2;
+}
+function drawEdges(){
+  var s='';
+  EDGES.forEach(function(e,idx){
+    var a=byId[e[0]], b=byId[e[1]];
+    var done = a.st==='done' && (b.st==='done'||b.st==='running');
+    var col = done ? 'rgba(124,92,255,.75)' : 'rgba(255,255,255,.17)';
+    s += '<path d="'+simplePath(a,b)+'" fill="none" stroke="'+col+'" stroke-width="'+(done?2:1.6)+'" stroke-linecap="round"'
+       + (done?' style="filter:drop-shadow(0 0 5px rgba(124,92,255,.5))"':'')+'></path>';
+    var mx = (a.x+NW+b.x)/2, my=(a.y+b.y)/2+32;
+    if(b.x>a.x) s += '<circle cx="'+mx+'" cy="'+my+'" r="'+(done?3:2.4)+'" fill="'+(done?'#A594FF':'rgba(255,255,255,.28)')+'"></circle>';
+  });
+  edgeG.innerHTML = s;
+}
+
+/* ---------- minimap ---------- */
+function drawMini(){
+  var pad=10, mw=mini.clientWidth-pad*2, mh=mini.clientHeight-pad*2;
+  if(mw<=0) return;
+  var s=Math.min(mw/WW, mh/WH);
+  var h='';
+  NODES.forEach(function(n){
+    var c=getComputedStyle(document.getElementById('app')).getPropertyValue(CAT[TMAP[n.k].c]).trim();
+    h+='<div class="mm-node" style="left:'+(pad+n.x*s)+'px;top:'+(pad+n.y*s)+'px;width:'+Math.max(3,NW*s)+'px;height:'+Math.max(2,NH*s)+'px;background:'+c+'"></div>';
+  });
+  var vw=canvas.clientWidth/z, vh=canvas.clientHeight/z, vx=-tx/z, vy=-ty/z;
+  h+='<div class="mm-view" style="left:'+(pad+vx*s)+'px;top:'+(pad+vy*s)+'px;width:'+(vw*s)+'px;height:'+(vh*s)+'px"></div>';
+  mini.innerHTML=h;
+}
+
+/* ---------- pan / zoom ---------- */
+var panning=false, marq=null, sx=0, sy=0, stx=0, sty=0, mEl=null;
+canvas.addEventListener('pointerdown', function(e){
+  if(e.target.closest('.node')||e.target.closest('.canvas-tools')||e.target.closest('.minimap')) return;
+  if(e.shiftKey){
+    marq={x:e.clientX,y:e.clientY};
+    mEl=document.createElement('div'); mEl.className='marquee'; canvas.appendChild(mEl);
+    canvas.classList.add('marquee-on');
+  }else{
+    panning=true; canvas.classList.add('grabbing');
+    if(!e.shiftKey) select([]);
+  }
+  sx=e.clientX; sy=e.clientY; stx=tx; sty=ty;
+  canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener('pointermove', function(e){
+  if(panning){ tx=stx+(e.clientX-sx); ty=sty+(e.clientY-sy); applyTransform(); }
+  else if(marq){
+    var r=canvas.getBoundingClientRect();
+    var x1=Math.min(marq.x,e.clientX)-r.left, y1=Math.min(marq.y,e.clientY)-r.top;
+    var w=Math.abs(e.clientX-marq.x), h=Math.abs(e.clientY-marq.y);
+    mEl.style.cssText='left:'+x1+'px;top:'+y1+'px;width:'+w+'px;height:'+h+'px';
+    var hit=[];
+    NODES.forEach(function(n){
+      var nx=n.x*z+tx, ny=n.y*z+ty, nw=NW*z, nh=NH*z;
+      if(nx<x1+w && nx+nw>x1 && ny<y1+h && ny+nh>y1) hit.push(n.id);
+    });
+    NODES.forEach(function(n){ el(n.id).classList.toggle('marq', hit.indexOf(n.id)>=0); });
+  }
+});
+canvas.addEventListener('pointerup', function(e){
+  if(marq){
+    var sel=[]; NODES.forEach(function(n){ var q=el(n.id); if(q.classList.contains('marq')){sel.push(n.id); q.classList.remove('marq');} });
+    select(sel);
+    mEl.remove(); mEl=null; marq=null; canvas.classList.remove('marquee-on');
+  }
+  panning=false; canvas.classList.remove('grabbing');
+});
+canvas.addEventListener('wheel', function(e){
+  e.preventDefault();
+  var r=canvas.getBoundingClientRect(), px=e.clientX-r.left, py=e.clientY-r.top;
+  var nz=Math.min(MAXZ,Math.max(MINZ, z*Math.pow(1.0016, -e.deltaY)));
+  tx = px-(px-tx)*(nz/z); ty = py-(py-ty)*(nz/z); z=nz; applyTransform();
+},{passive:false});
+
+function zoomTo(nz){
+  var px=canvas.clientWidth/2, py=canvas.clientHeight/2;
+  nz=Math.min(MAXZ,Math.max(MINZ,nz));
+  tx=px-(px-tx)*(nz/z); ty=py-(py-ty)*(nz/z); z=nz; applyTransform();
+}
+document.getElementById('zIn').onclick=function(){zoomTo(z*1.22);};
+document.getElementById('zOut').onclick=function(){zoomTo(z/1.22);};
+document.getElementById('zVal').onclick=function(){zoomTo(1);};
+document.getElementById('zFit').onclick=fit;
+function fit(){
+  var pad=44, s=Math.min((canvas.clientWidth-pad*2)/WW,(canvas.clientHeight-pad*2)/WH);
+  z=Math.min(MAXZ,Math.max(MINZ,s));
+  tx=(canvas.clientWidth-WW*z)/2; ty=(canvas.clientHeight-WH*z)/2; applyTransform();
+}
+
+/* ---------- node drag ---------- */
+var drag=null;
+nodeL.addEventListener('pointerdown', function(e){
+  var n=e.target.closest('.node'); if(!n) return;
+  e.stopPropagation();
+  var id=n.dataset.id;
+  if(e.shiftKey){ toggle(id); } else if(SEL.indexOf(id)<0){ select([id]); }
+  var o=byId[id];
+  drag={id:id, ox:e.clientX, oy:e.clientY, sx:{}, moved:false};
+  SEL.forEach(function(s){ drag.sx[s]={x:byId[s].x, y:byId[s].y}; });
+  n.classList.add('dragging'); n.setPointerCapture(e.pointerId);
+});
+nodeL.addEventListener('pointermove', function(e){
+  if(!drag) return;
+  var dx=(e.clientX-drag.ox)/z, dy=(e.clientY-drag.oy)/z;
+  if(Math.abs(dx)>1||Math.abs(dy)>1) drag.moved=true;
+  SEL.forEach(function(s){
+    var b=drag.sx[s]; if(!b) return;
+    var n=byId[s];
+    n.x=Math.round((b.x+dx)/20)*20;   /* snap */
+    n.y=Math.round((b.y+dy)/20)*20;
+    var q=el(s); q.style.left=n.x+'px'; q.style.top=n.y+'px';
+  });
+  drawEdges(); drawMini();
+});
+nodeL.addEventListener('pointerup', function(e){
+  if(!drag) return;
+  var q=el(drag.id); if(q) q.classList.remove('dragging');
+  drag=null;
+});
+
+/* ---------- selection ---------- */
+var SEL=[];
+function select(ids){ SEL=ids.slice(); syncSel(); }
+function toggle(id){ var i=SEL.indexOf(id); if(i<0) SEL.push(id); else SEL.splice(i,1); syncSel(); }
+function syncSel(){
+  NODES.forEach(function(n){ el(n.id).classList.toggle('sel', SEL.indexOf(n.id)>=0); });
+  renderInspector();
+}
+nodeL.addEventListener('click', function(e){
+  var n=e.target.closest('.node'); if(!n) return;
+  if(drag&&drag.moved) return;
+});
+nodeL.addEventListener('keydown', function(e){
+  var n=e.target.closest('.node'); if(!n) return;
+  if(e.key==='Enter'||e.key===' '){ e.preventDefault(); select([n.dataset.id]); }
+});
+
+/* ---------- inspector ---------- */
+var TAB='params';
+document.querySelectorAll('.tab').forEach(function(t){
+  t.addEventListener('click', function(){
+    document.querySelectorAll('.tab').forEach(function(x){x.setAttribute('aria-selected','false');});
+    t.setAttribute('aria-selected','true'); TAB=t.dataset.tab; renderInspector();
+  });
+});
+
+var SCHEMA = {
+  image:[
+    {l:'Node Name', t:'text', v:'Image Generation'},
+    {l:'Provider', t:'select', o:['9 Router','Hugging Face (fallback)'], v:'9 Router'},
+    {l:'Image Combo', t:'env', v:'NINE_ROUTER_IMAGE_COMBO', h:'Resolves to ag/gemini-3.1-flash-image-9x16'},
+    {l:'Prompt Source', t:'select', o:['Scene Prompt','Thumbnail Prompt','Custom'], v:'Scene Prompt'},
+    {l:'Output Folder', t:'text', v:'images/'},
+    {l:'Concurrency', t:'num', v:'1', h:'Scenes share one router quota — a burst turns a rate limit into a failed step.'},
+    {l:'Retry', t:'num', v:'3'},
+    {l:'Timeout', t:'num', v:'180000', h:'Milliseconds.'}
+  ],
+  thumb:[
+    {l:'Provider', t:'select', o:['9 Router','Hugging Face (fallback)'], v:'9 Router'},
+    {l:'Combo', t:'env', v:'NINE_ROUTER_IMAGE_COMBO'},
+    {l:'Prompt Source', t:'select', o:['Thumbnail Prompt','Scene Prompt'], v:'Thumbnail Prompt'},
+    {l:'Output Folder', t:'text', v:'thumbnail/'}
+  ]
+};
+var GENERIC = [
+  {l:'Node Name', t:'text', v:''},
+  {l:'Continue on fail', t:'switch', v:false},
+  {l:'Retry', t:'num', v:'3'},
+  {l:'Timeout', t:'num', v:'60000'}
+];
+
+function fieldHTML(f){
+  var body;
+  if(f.t==='select'){ body='<select class="inp">'+f.o.map(function(o){return '<option'+(o===f.v?' selected':'')+'>'+o+'</option>';}).join('')+'</select>'; }
+  else if(f.t==='env'){ body='<input class="inp mono" value="'+f.v+'" readonly>'; }
+  else if(f.t==='switch'){ return '<div class="field"><div class="toggle-row"><label>'+f.l+'</label><button class="switch" role="switch" aria-checked="'+(f.v?'true':'false')+'"><i></i></button></div></div>'; }
+  else if(f.t==='num'){ body='<input class="inp num" value="'+f.v+'">'; }
+  else { body='<input class="inp" value="'+f.v+'">'; }
+  return '<div class="field"><label>'+f.l+(f.t==='env'?' <span class="env-tag">env</span>':'')+'</label>'+body+(f.h?'<span class="help">'+f.h+'</span>':'')+'</div>';
+}
+
+function renderInspector(){
+  var body=document.getElementById('inspBody');
+  var iIcon=document.getElementById('iIcon'), iTitle=document.getElementById('iTitle'), iSub=document.getElementById('iSub');
+
+  if(SEL.length===0){
+    iIcon.style.setProperty('--c','var(--a-faint)'); iIcon.innerHTML=svg(I.branch,15);
+    iTitle.textContent='No selection'; iSub.textContent='Pick a node on the canvas';
+    body.innerHTML='<div class="empty">'+svg(I.branch,26)+'<div>Select a node to edit its parameters.<br>Shift-drag the canvas to select several.</div></div>';
+    return;
+  }
+  if(SEL.length>1){
+    iIcon.style.setProperty('--c','var(--a-accent)'); iIcon.innerHTML=svg(I.layers,15);
+    iTitle.textContent=SEL.length+' nodes selected'; iSub.textContent='Shared fields only';
+    body.innerHTML='<p class="sec-label">Bulk edit</p>'
+      + fieldHTML({l:'Continue on fail',t:'switch',v:false})
+      + fieldHTML({l:'Retry',t:'num',v:'3'})
+      + fieldHTML({l:'Timeout',t:'num',v:'60000'})
+      + '<div class="divider"></div><button class="btn" style="width:100%;justify-content:center">Disable '+SEL.length+' nodes</button>';
+    return;
+  }
+
+  var n=byId[SEL[0]], T=TMAP[n.k];
+  iIcon.style.setProperty('--c','var('+CAT[T.c]+')'); iIcon.innerHTML=svg(T.i,15);
+  iTitle.textContent=T.t; iSub.textContent=T.s;
+
+  if(TAB==='params'){
+    var f = SCHEMA[n.k];
+    if(!f){ f = GENERIC.map(function(x){return x.l==='Node Name'?{l:x.l,t:'text',v:T.t}:x;}); }
+    body.innerHTML='<p class="sec-label">Parameters</p>'+f.map(fieldHTML).join('');
+  }
+  else if(TAB==='adv'){
+    body.innerHTML='<p class="sec-label">Execution</p>'
+      + fieldHTML({l:'Continue on fail',t:'switch',v:false})
+      + fieldHTML({l:'Always output data',t:'switch',v:true})
+      + fieldHTML({l:'Backoff (ms)',t:'text',v:'1000, 3000, 10000',h:'One delay per retry attempt.'})
+      + '<div class="divider"></div><p class="sec-label">Notes</p>'
+      + '<div class="field"><textarea class="inp" style="height:74px;padding:9px 11px;resize:vertical">Router is primary. Falls back to Hugging Face only after the router spends its own retry budget.</textarea></div>';
+  }
+  else if(TAB==='logs'){
+    if(n.st==='idle'){ body.innerHTML='<div class="empty">'+svg(I.doc,26)+'<div>No logs yet.<br>Run the workflow to populate this tab.</div></div>'; }
+    else{
+      body.innerHTML='<div class="out-card"><header>'+svg(I.doc,12)+' '+T.t+'</header><pre class="mono">'
+        +'<span class="s">START</span>   step=<span class="k">'+n.k.toUpperCase()+'</span> attempt=<span class="n">1</span>\n'
+        +(n.st==='done'?'<span class="s">SUCCESS</span> durationMs=<span class="n">'+(n.time||'—').replace(/[^0-9]/g,'')+'</span> retryCount=<span class="n">0</span>':'<span class="k">RUNNING</span> …')
+        +'</pre></div>';
+    }
+  }
+  else{
+    if(n.st!=='done'){ body.innerHTML='<div class="empty">'+svg(I.layers,26)+'<div>Output appears once this node succeeds.</div></div>'; }
+    else{
+      var samples={
+        image:'{\n  <span class="k">"images"</span>: <span class="n">8</span>,\n  <span class="k">"directory"</span>: <span class="s">"images/"</span>,\n  <span class="k">"first"</span>: <span class="s">"scene-001.jpg"</span>,\n  <span class="k">"size"</span>: <span class="s">"768x1376"</span>,\n  <span class="k">"combo"</span>: <span class="s">"ag/gemini-3.1-flash-image-9x16"</span>\n}',
+        voice:'{\n  <span class="k">"file"</span>: <span class="s">"audio/narration.mp3"</span>,\n  <span class="k">"blocks"</span>: <span class="n">19</span>,\n  <span class="k">"timelineSeconds"</span>: <span class="n">56.108</span>,\n  <span class="k">"assembledSeconds"</span>: <span class="n">56.136</span>\n}',
+        render:'{\n  <span class="k">"file"</span>: <span class="s">"video/final.mp4"</span>,\n  <span class="k">"resolution"</span>: <span class="s">"1080x1920"</span>,\n  <span class="k">"durationMs"</span>: <span class="n">56108</span>,\n  <span class="k">"bytes"</span>: <span class="n">8902678</span>\n}'
+      };
+      body.innerHTML='<div class="out-card"><header>'+svg(I.code,12)+' JSON</header><pre class="mono">'
+        +(samples[n.k]||'{\n  <span class="k">"status"</span>: <span class="s">"ok"</span>\n}')+'</pre></div>';
+    }
+  }
+
+  body.querySelectorAll('.switch').forEach(function(s){
+    s.addEventListener('click', function(){ s.setAttribute('aria-checked', s.getAttribute('aria-checked')==='true'?'false':'true'); });
+  });
+}
+
+/* ---------- console ---------- */
+var conBody=document.getElementById('conBody');
+function log(lv, src, msg){
+  var d=new Date(), t=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0');
+  var row=document.createElement('div'); row.className='log';
+  row.innerHTML='<time>'+t+'</time><span class="lv '+lv[0]+'">'+lv[1]+'</span><span class="src">'+src+'</span><span class="msg">'+msg+'</span>';
+  conBody.appendChild(row); conBody.scrollTop=conBody.scrollHeight;
+}
+document.getElementById('clearBtn').onclick=function(){conBody.innerHTML='';};
+var conEl=document.getElementById('console');
+document.getElementById('conToggle').onclick=function(){
+  var c=conEl.dataset.collapsed==='1'?'0':'1';
+  conEl.dataset.collapsed=c;
+  document.getElementById('conChev').style.transform=c==='1'?'rotate(180deg)':'';
+  conBody.hidden = c==='1';
+};
+
+/* ---------- run simulation ---------- */
+var running=false, t0=0, timer=null;
+var RUNLOG = {
+  n1:[['ok','START','Triggered manually by <em>Yusuf Fauziyan</em>']],
+  n2:[['i','ROUTER','combo=<em>bodha/opus</em> · temperature 0.9'],['ok','TOPIC','“Why does Google show different results in Incognito?”']],
+  n3:[['ok','SCRIPT','hook + 6 beats · 47.4s estimated read']],
+  n4:[['ok','SCENE','8 scenes planned · 5.9s average']],
+  n5:[['ok','VISUAL','8 image briefs · style=cinematic · 9:16']],
+  n6:[['i','ROUTER','combo=<em>ag/gemini-3.1-flash-image-9x16</em>'],
+      ['ok','IMAGE','scene-001.jpg · 768×1376 · 292 KB'],
+      ['ok','IMAGE','scene-004.jpg · 768×1376 · 455 KB'],
+      ['w','ROUTER','429 on attempt 2 — retrying in 3s'],
+      ['ok','IMAGE','8/8 stills written to <em>images/</em>']],
+  n7:[['i','SPEECH','google-tts/en · speed=1.0 · 19 blocks'],
+      ['ok','VOICE','narration.mp3 · timeline 56.108s · file 56.136s']],
+  n8:[['ok','SUBTITLE','19 cues · max 2 lines · 42 chars']],
+  n9:[['i','FFMPEG','1080×1920 · 30fps · libx264 crf 23'],
+      ['ok','RENDER','final.mp4 · 8.9 MB · 56.108s']],
+  n10:[['ok','THUMB','thumbnail.jpg · 1080×1920']],
+  n11:[['i','TIKTOK','uploading final.mp4 …'],['ok','UPLOAD','published · verified in 4.1s']],
+  n12:[['ok','CLEANUP','28 files removed · metadata kept']]
+};
+function setState(n, st, time){
+  n.st=st; if(time!==undefined) n.time=time;
+  var q=el(n.id); q.dataset.s=st;
+  var p=q.querySelector('.n-state'); p.dataset.s = st==='idle'?'idle':(st==='queued'?'idle':st);
+  var lbl={idle:'Idle',queued:'Queued',running:'Running',done:'Success',warn:'Warning',error:'Failed'}[st]||st;
+  p.querySelector('.lbl').textContent=lbl;
+  q.querySelector('.n-time').textContent=n.time||'';
+  drawEdges();
+  if(SEL.indexOf(n.id)>=0) renderInspector();
+}
+document.getElementById('runBtn').onclick=function(){
+  if(running) return;
+  running=true; this.disabled=true;
+  conBody.innerHTML=''; t0=Date.now();
+  NODES.forEach(function(n){ setState(n,'queued',''); });
+  var pill=document.getElementById('statePill');
+  pill.dataset.state='active'; document.getElementById('stateTxt').textContent='Active';
+  timer=setInterval(function(){ document.getElementById('elapsed').textContent=((Date.now()-t0)/1000).toFixed(1)+'s'; },100);
+  log(['i','INFO'],'workflow','Run started · <em>Short — Google Search Engine</em>');
+  step(0);
+};
+function step(i){
+  if(i>=NODES.length){
+    clearInterval(timer);
+    log(['ok','DONE'],'workflow','Completed 12/12 steps in '+((Date.now()-t0)/1000).toFixed(1)+'s');
+    document.getElementById('curNode').textContent='—';
+    running=false; document.getElementById('runBtn').disabled=false;
+    return;
+  }
+  var n=NODES[i], T=TMAP[n.k];
+  setState(n,'running','');
+  document.getElementById('curNode').textContent=T.t;
+  var bar=el(n.id).querySelector('.n-bar i');
+  var dur=420+Math.random()*380, s=Date.now();
+  var lines=(RUNLOG[n.id]||[]).slice(), li=0;
+  var iv=setInterval(function(){
+    var p=Math.min(1,(Date.now()-s)/dur);
+    bar.style.width=(p*100)+'%';
+    if(li<lines.length && p> (li+1)/(lines.length+1)){
+      var L=lines[li++]; log([L[0],L[1]], T.t.split(' ')[0], L[2]);
+    }
+    if(p>=1){
+      clearInterval(iv);
+      while(li<lines.length){ var L2=lines[li++]; log([L2[0],L2[1]], T.t.split(' ')[0], L2[2]); }
+      setState(n,'done',n.est==='—'?'0.1s':n.est);
+      bar.style.width='0%';
+      var pr=(i+1)/NODES.length;
+      document.getElementById('progBar').style.width=(pr*100)+'%';
+      document.getElementById('progTxt').textContent=(i+1)+' / '+NODES.length;
+      step(i+1);
+    }
+  },40);
+}
+
+/* ---------- chrome ---------- */
+document.getElementById('railBtn').onclick=function(){
+  var a=document.getElementById('app');
+  a.dataset.rail = a.dataset.rail==='1'?'0':'1';
+  setTimeout(drawMini,260);
+};
+document.getElementById('statePill').onclick=function(){
+  var on=this.dataset.state==='active';
+  this.dataset.state=on?'draft':'active';
+  document.getElementById('stateTxt').textContent=on?'Draft':'Active';
+};
+document.getElementById('saveBtn').onclick=function(){ log(['ok','SAVED'],'workflow','Revision 24 saved'); };
+document.getElementById('pubBtn').onclick=function(){
+  document.getElementById('statePill').dataset.state='active';
+  document.getElementById('stateTxt').textContent='Active';
+  log(['ok','PUBLISHED'],'workflow','Live · schedule 07:00 WIB daily');
+};
+
+/* ---------- catalogue ---------- */
+document.getElementById('catalogue').innerHTML = TYPES.map(function(t){
+  var hex={trigger:'#3DD68C',ai:'#8B7BFF',media:'#4CA6FF',video:'#FF6B6B',upload:'#FF7AC6',logic:'#FFA24C'}[t.c];
+  return '<div class="cat-i" style="--c:'+hex+'"><div class="cat-ic">'+svg(t.i,15)+'</div>'
+       + '<div class="cat-t"><b>'+t.t+'</b><span>'+t.c+'</span></div></div>';
+}).join('');
+
+/* ---------- boot ---------- */
+drawEdges();
+select(['n6']);            /* Image Generation, as specified */
+requestAnimationFrame(function(){ fit(); });
+window.addEventListener('resize', function(){ drawMini(); });
+log(['i','READY'],'workflow','12 nodes loaded · press Run to execute');
+})();
+</script>
