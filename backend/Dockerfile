@@ -35,7 +35,7 @@ RUN pnpm exec tsc --project tsconfig.build.json
 RUN cp -R src/prompts dist/prompts
 
 # --- Stage 3: production dependencies --------------------------------------
-FROM deps AS prod-deps
+FROM build AS prod-deps
 WORKDIR /app
 RUN pnpm prune --prod
 
