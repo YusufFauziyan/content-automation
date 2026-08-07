@@ -8,11 +8,7 @@ import {
 } from '../types/errors/publish.error.js';
 import type { Logger } from '../types/logger.js';
 import { hasSignInCookies } from '../utils/credential/session-import.js';
-import type {
-  PlaywrightService,
-  PublishRequest,
-  PublishResult,
-} from './playwright.service.js';
+import type { PlaywrightService, PublishRequest, PublishResult } from './playwright.service.js';
 import { captionWithTags } from './playwright.service.js';
 
 /**
@@ -70,10 +66,7 @@ const SELECTORS = {
    * so every selector after this point misses and the failure reads as "the
    * page has probably changed" when the page is fine and simply not shown.
    */
-  skipInterstitial: [
-    'a:has-text("Skip to YouTube Studio")',
-    'text=/skip to youtube studio/i',
-  ],
+  skipInterstitial: ['a:has-text("Skip to YouTube Studio")', 'text=/skip to youtube studio/i'],
   /** Opens the uploader when Studio lands on the dashboard instead of it. */
   createButton: [
     '#create-icon',
@@ -315,7 +308,9 @@ export class YouTubePublishService implements PlaywrightService {
     try {
       return await chromium.launch({ ...options, channel: 'chrome' });
     } catch {
-      return chromium.launch(options).catch(() => chromium.launch({ headless: true, args: UNDETECTABLE }));
+      return chromium
+        .launch(options)
+        .catch(() => chromium.launch({ headless: true, args: UNDETECTABLE }));
     }
   }
 
@@ -712,4 +707,3 @@ export class YouTubePublishService implements PlaywrightService {
     return (await this.find(page, candidates, timeoutMs)) !== null;
   }
 }
-
