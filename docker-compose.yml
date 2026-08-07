@@ -79,6 +79,8 @@ services:
       HTTP_PORT: 4000
       PROMPTS_DIR: dist/prompts
       OUTPUT_DIR: /app/output
+      FFMPEG_PATH: ffmpeg
+      FFPROBE_PATH: ffprobe
     # `serve` is the long-running command: the HTTP API the editor talks to,
     # plus the scheduler tick. Without it the image would run one CLI job.
     command: ['node', 'dist/main.js', 'serve']
