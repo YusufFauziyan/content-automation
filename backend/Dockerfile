@@ -50,7 +50,7 @@ ENV NODE_ENV=production
 # is what makes burned-in subtitles possible; a build without it cannot render
 # captions at all.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ffmpeg \
+ && apt-get install -y --no-install-recommends ffmpeg xvfb \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=prod-deps /app/node_modules ./node_modules

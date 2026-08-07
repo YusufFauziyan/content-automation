@@ -335,7 +335,16 @@ export class PlaywrightPublishService implements PlaywrightService {
         source: PlaywrightPublishService.name,
       });
 
-      return chromium.launch(options);
+      try {
+        return await chromium.launch(options);
+      } catch (error) {
+        this.logger.warn('Headful browser launch failed, falling back to headless browser', {
+          source: PlaywrightPublishService.name,
+          error: error instanceof Error ? error.message : String(error),
+        });
+
+        return await chromium.launch({ ...options, headless: true });
+      }
     }
   }
 
