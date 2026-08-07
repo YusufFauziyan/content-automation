@@ -236,7 +236,8 @@ export class PlaywrightPublishService implements PlaywrightService {
   public async publish(request: PublishRequest): Promise<PublishResult> {
     const browser = await chromium
       .launch({ headless: this.config.headless, args: UNDETECTABLE, channel: 'chrome' })
-      .catch(() => chromium.launch({ headless: this.config.headless, args: UNDETECTABLE }));
+      .catch(() => chromium.launch({ headless: this.config.headless, args: UNDETECTABLE }))
+      .catch(() => chromium.launch({ headless: true, args: UNDETECTABLE }));
 
     try {
       return await this.publishWith(browser, request);

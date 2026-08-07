@@ -81,6 +81,8 @@ services:
       OUTPUT_DIR: /app/output
       FFMPEG_PATH: ffmpeg
       FFPROBE_PATH: ffprobe
+      TIKTOK_HEADLESS: 'true'
+      YOUTUBE_HEADLESS: 'true'
     # `serve` is the long-running command: the HTTP API the editor talks to,
     # plus the scheduler tick. Without it the image would run one CLI job.
     command: ['node', 'dist/main.js', 'serve']

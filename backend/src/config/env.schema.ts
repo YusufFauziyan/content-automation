@@ -153,7 +153,7 @@ export const envSchema = z
     TIKTOK_LOGIN_TIMEOUT: z.coerce.number().int().positive().default(300_000),
     TIKTOK_MAX_HASHTAGS: z.coerce.number().int().min(0).max(30).default(5),
     TIKTOK_MADE_FOR_KIDS: z.stringbool().default(false),
-    TIKTOK_HEADLESS: z.stringbool().default(false),
+    TIKTOK_HEADLESS: z.stringbool().default(true),
     TIKTOK_TIMEOUT: z.coerce.number().int().positive().default(120_000),
     TIKTOK_MAX_RETRIES: z.coerce.number().int().min(0).max(10).default(1),
     TIKTOK_BACKOFF_MS: z.string().default('5000,15000'),
@@ -175,7 +175,7 @@ export const envSchema = z
     // YouTube's own ceiling: it ignores hashtags past the fifteenth.
     YOUTUBE_MAX_HASHTAGS: z.coerce.number().int().min(0).max(30).default(15),
     YOUTUBE_MADE_FOR_KIDS: z.stringbool().default(false),
-    YOUTUBE_HEADLESS: z.stringbool().default(false),
+    YOUTUBE_HEADLESS: z.stringbool().default(true),
     YOUTUBE_TIMEOUT: z.coerce.number().int().positive().default(180_000),
     YOUTUBE_MAX_RETRIES: z.coerce.number().int().min(0).max(10).default(1),
     YOUTUBE_BACKOFF_MS: z.string().default('5000,15000'),
