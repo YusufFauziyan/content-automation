@@ -64,9 +64,8 @@ COPY prisma.config.ts ./
 
 # Preserve Playwright browser and Prisma cached engine binaries for both root (migrate) and node (backend) users
 ENV PLAYWRIGHT_BROWSERS_PATH=/home/node/.cache/ms-playwright
-RUN corepack enable \
- && pnpm exec playwright install-deps chromium \
- && pnpm exec playwright install chromium
+RUN node node_modules/playwright/cli.js install-deps chromium \
+ && node node_modules/playwright/cli.js install chromium
 
 COPY --from=build /root/.cache/prisma /root/.cache/prisma
 RUN mkdir -p /home/node/.cache && cp -R /root/.cache/prisma /home/node/.cache/prisma && chown -R node:node /home/node/.cache
