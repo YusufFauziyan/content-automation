@@ -30,6 +30,8 @@ COPY src ./src
 # The Prisma client is generated into src/database/generated, so it must exist
 # before tsc runs. No database is contacted at build time.
 RUN pnpm exec prisma generate
+# Pre-download the Prisma migration engine (schema-engine) during build while network is available
+RUN DATABASE_URL="postgresql://placeholder:placeholder@127.0.0.1:5432/placeholder" pnpm exec prisma migrate status || true
 RUN pnpm exec tsc --project tsconfig.build.json
 # Prompts are data, not code: tsc ignores them, so copy them next to the build.
 RUN cp -R src/prompts dist/prompts
@@ -59,6 +61,10 @@ COPY package.json ./
 COPY src/database/prisma ./src/database/prisma
 COPY src/database/migrations ./src/database/migrations
 COPY prisma.config.ts ./
+
+# Preserve Prisma cached engine binaries for both root (migrate) and node (backend) users
+COPY --from=build /root/.cache/prisma /root/.cache/prisma
+RUN mkdir -p /home/node/.cache && cp -R /root/.cache/prisma /home/node/.cache/prisma && chown -R node:node /home/node/.cache
 
 # Scratch space for disposable media. Deleted by the Cleanup Agent after every
 # verified upload.
