@@ -315,7 +315,7 @@ export class YouTubePublishService implements PlaywrightService {
     try {
       return await chromium.launch({ ...options, channel: 'chrome' });
     } catch {
-      return chromium.launch(options);
+      return chromium.launch(options).catch(() => chromium.launch({ headless: true, args: UNDETECTABLE }));
     }
   }
 
