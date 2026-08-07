@@ -62,7 +62,11 @@ COPY src/database/prisma ./src/database/prisma
 COPY src/database/migrations ./src/database/migrations
 COPY prisma.config.ts ./
 
-# Preserve Prisma cached engine binaries for both root (migrate) and node (backend) users
+# Preserve Playwright browser and Prisma cached engine binaries for both root (migrate) and node (backend) users
+ENV PLAYWRIGHT_BROWSERS_PATH=/home/node/.cache/ms-playwright
+RUN npx playwright install-deps chromium \
+ && npx playwright install chromium
+
 COPY --from=build /root/.cache/prisma /root/.cache/prisma
 RUN mkdir -p /home/node/.cache && cp -R /root/.cache/prisma /home/node/.cache/prisma && chown -R node:node /home/node/.cache
 
