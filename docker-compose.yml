@@ -81,13 +81,14 @@ services:
       OUTPUT_DIR: /app/output
       FFMPEG_PATH: ffmpeg
       FFPROBE_PATH: ffprobe
-      TIKTOK_HEADLESS: 'true'
-      YOUTUBE_HEADLESS: 'true'
+      TIKTOK_HEADLESS: 'false'
+      YOUTUBE_HEADLESS: 'false'
     # `serve` is the long-running command: the HTTP API the editor talks to,
     # plus the scheduler tick. Without it the image would run one CLI job.
     command: ['node', 'dist/main.js', 'serve']
     ports:
       - '${BACKEND_PORT:-4000}:4000'
+      - '6080:6080'
     volumes:
       # Generated media is disposable; a named volume keeps it out of the image
       # and out of the repository. Shared with the editor, which reads the

@@ -50,7 +50,7 @@ ENV NODE_ENV=production
 # is what makes burned-in subtitles possible; a build without it cannot render
 # captions at all.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ffmpeg xvfb xauth \
+ && apt-get install -y --no-install-recommends ffmpeg xvfb xauth novnc websockify x11vnc fluxbox \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=prod-deps /app/node_modules ./node_modules
@@ -61,6 +61,8 @@ COPY package.json ./
 COPY src/database/prisma ./src/database/prisma
 COPY src/database/migrations ./src/database/migrations
 COPY prisma.config.ts ./
+COPY scripts/start-backend.sh ./scripts/start-backend.sh
+RUN chmod +x ./scripts/start-backend.sh
 
 # Preserve Playwright browser and Prisma cached engine binaries for both root (migrate) and node (backend) users
 ENV PLAYWRIGHT_BROWSERS_PATH=/home/node/.cache/ms-playwright
@@ -75,4 +77,4 @@ RUN mkdir -p /home/node/.cache && cp -R /root/.cache/prisma /home/node/.cache/pr
 RUN mkdir -p /app/output && chown -R node:node /app/output
 
 USER node
-CMD ["node", "dist/main.js", "generate"]
+CMD ["/app/scripts/start-backend.sh", "serve"]
