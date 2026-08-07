@@ -151,6 +151,53 @@ const SELECTORS = {
   signedOut: ['text=/log in to tiktok/i', '[data-e2e="login-button"]'],
 } as const;
 
+/**
+ * What TikTok puts on top of its own uploader once a file has been accepted.
+ *
+ * Accepting a video raises a notice about the automatic copyright check, and it
+ * arrives as a floating-ui portal: either a modal with a full-page overlay, or
+ * a tooltip anchored near the caption box. Both sit above the form and swallow
+ * pointer events, so a click on the caption is retried until the stage budget
+ * is gone — 120s per attempt, three attempts, and a run that failed with the
+ * video already uploaded.
+ *
+ * The notice closes on its own, but not before an unlucky click has started
+ * retrying against it. So it is closed deliberately instead of waited out.
+ */
+const NOTICE = {
+  /** Anything a floating-ui portal has put over the form. */
+  overlay: [
+    '[data-floating-ui-portal] .TUXModal-overlay',
+    '[data-floating-ui-portal] [role="dialog"]',
+    '[data-floating-ui-portal] [role="tooltip"]',
+  ].join(', '),
+  /**
+   * The controls that close one, scoped to the modal so a text match cannot
+   * wander onto the form itself and press something that posts.
+   */
+  dismiss: [
+    '[data-e2e="modal-close-inner-button"]',
+    '.TUXModal button[aria-label*="close" i]',
+    '.TUXModal button:has-text("Got it")',
+    '.TUXModal button:has-text("OK")',
+    '.TUXModal button:has-text("Continue")',
+  ],
+} as const;
+
+/**
+ * How long one click may spend retrying before the overlay is blamed.
+ *
+ * Short on purpose, and much shorter than the stage budget: this timeout is not
+ * how long the control takes to appear — {@link PlaywrightPublishService.locate}
+ * has already established that it is there — it is how long an obstruction is
+ * given to clear before working around it. Spending the whole budget here is
+ * exactly the failure this replaces.
+ */
+const CLICK_MS = 10_000;
+
+/** How long to wait for a dismissed notice to actually leave the page. */
+const NOTICE_CLEAR_MS = 5_000;
+
 /** How often to re-read the address bar while waiting for a sign-in. */
 const SIGN_IN_POLL_MS = 1_000;
 
@@ -423,7 +470,9 @@ export class PlaywrightPublishService implements PlaywrightService {
 
   private async writeCaption(page: Page, caption: string): Promise<void> {
     const box = await this.locate(page, SELECTORS.caption, 'the caption box');
-    await box.click();
+
+    await this.dismissNotices(page);
+    await this.focusCaption(box);
 
     // TikTok pre-fills the caption with the file name. Selecting all and typing
     // over it is the only reliable clear: the editor is a Draft.js surface that
@@ -431,6 +480,70 @@ export class PlaywrightPublishService implements PlaywrightService {
     await page.keyboard.press('ControlOrMeta+A');
     await page.keyboard.press('Backspace');
     await box.pressSequentially(caption, { delay: 20 });
+  }
+
+  /**
+   * Puts the caret in the caption box, whatever is currently over it.
+   *
+   * A click is tried first because it is what a person does, and it leaves
+   * Draft.js in the state it expects. When something is still in the way, the
+   * caret is placed by focusing the element directly: no pointer is involved,
+   * so nothing can intercept it. Everything after this is keyboard input, which
+   * an overlay cannot swallow — so a focus that skipped the pointer is as good
+   * as a click that landed.
+   */
+  private async focusCaption(box: Locator): Promise<void> {
+    try {
+      await box.click({ timeout: CLICK_MS });
+
+      return;
+    } catch {
+      // Still obstructed. Fall through rather than spend the stage budget
+      // retrying a click against a notice that owns the pointer.
+    }
+
+    this.logger.warn('The caption box was obstructed; focusing it without the pointer', {
+      source: PlaywrightPublishService.name,
+    });
+
+    // Typed structurally: this project's TypeScript has no DOM library, and the
+    // only thing needed from the element is that it can take focus.
+    await box.evaluate((element: { focus: () => void }) => {
+      element.focus();
+    });
+  }
+
+  /**
+   * Closes whatever TikTok has floated over the uploader.
+   *
+   * Best-effort throughout: a notice that is already gone, or that has no
+   * button this knows, must not fail a run whose video is uploaded. Escape is
+   * the parting shot — it closes the tooltip variant, which has no control of
+   * its own, and moving the pointer to the corner keeps a hover from putting it
+   * straight back.
+   */
+  private async dismissNotices(page: Page): Promise<void> {
+    const overlay = page.locator(NOTICE.overlay).first();
+
+    if (!(await overlay.isVisible().catch(() => false))) return;
+
+    this.logger.info('Dismissing a TikTok notice over the uploader', {
+      source: PlaywrightPublishService.name,
+    });
+
+    const close = await this.find(page, NOTICE.dismiss);
+    await close?.click({ timeout: CLICK_MS }).catch(() => undefined);
+
+    await page.keyboard.press('Escape').catch(() => undefined);
+    await page.mouse.move(0, 0).catch(() => undefined);
+
+    await overlay
+      .waitFor({ state: 'hidden', timeout: NOTICE_CLEAR_MS })
+      .catch(() => {
+        this.logger.warn('A TikTok notice would not close; working around it', {
+          source: PlaywrightPublishService.name,
+        });
+      });
   }
 
   /**
@@ -454,7 +567,7 @@ export class PlaywrightPublishService implements PlaywrightService {
       return;
     }
 
-    await chooser.click();
+    if (!(await this.tap(chooser, 'the audience chooser'))) return;
 
     const everyone = await this.find(page, SELECTORS.everyone);
 
@@ -466,10 +579,33 @@ export class PlaywrightPublishService implements PlaywrightService {
       return;
     }
 
-    await everyone.click();
+    if (!(await this.tap(everyone, 'the public option'))) return;
+
     this.logger.info('Set the audience to everyone', {
       source: PlaywrightPublishService.name,
     });
+  }
+
+  /**
+   * A click on a control the run can do without.
+   *
+   * Bounded and never fatal, which is what the callers already claim to be:
+   * they check for the control and log when it is missing, but an unbounded
+   * `click` on one that is present-yet-covered still spends the whole stage
+   * budget and then throws, taking a finished video down with a thumbnail.
+   */
+  private async tap(target: Locator, what: string): Promise<boolean> {
+    try {
+      await target.click({ timeout: CLICK_MS });
+
+      return true;
+    } catch {
+      this.logger.warn(`Could not click ${what}; continuing without it`, {
+        source: PlaywrightPublishService.name,
+      });
+
+      return false;
+    }
   }
 
   /**
@@ -484,6 +620,8 @@ export class PlaywrightPublishService implements PlaywrightService {
   private async setCover(page: Page, coverPath: string | null): Promise<void> {
     if (coverPath === null) return;
 
+    await this.dismissNotices(page);
+
     const editor = await this.find(page, SELECTORS.editCover);
 
     if (editor === null) {
@@ -494,12 +632,12 @@ export class PlaywrightPublishService implements PlaywrightService {
       return;
     }
 
-    await editor.click();
+    if (!(await this.tap(editor, 'the cover editor'))) return;
 
     // The editor opens on the frame picker; the upload tab is a click away and
     // is the only path that accepts a file rather than a timestamp.
     const tab = await this.find(page, SELECTORS.uploadCoverTab);
-    if (tab !== null) await tab.click();
+    if (tab !== null) await this.tap(tab, 'the upload-cover tab');
 
     const input = await this.find(page, SELECTORS.coverInput);
 
@@ -514,7 +652,7 @@ export class PlaywrightPublishService implements PlaywrightService {
     await input.setInputFiles(coverPath);
 
     const confirm = await this.find(page, SELECTORS.confirmCover);
-    if (confirm !== null) await confirm.click();
+    if (confirm !== null) await this.tap(confirm, 'the cover confirmation');
 
     this.logger.info('Set the cover from a generated still', {
       source: PlaywrightPublishService.name,
@@ -523,18 +661,50 @@ export class PlaywrightPublishService implements PlaywrightService {
   }
 
   private async submit(page: Page): Promise<void> {
+    await this.dismissNotices(page);
     await this.setPublic(page);
 
     const post = await this.locate(page, SELECTORS.post, 'the Post button');
     await post.waitFor({ state: 'visible' });
     await this.settle(page, post);
-    await post.click();
+
+    // The notice can outlive the upload it announced, and the Post button is
+    // the one click in this flow with nothing after it to compensate.
+    await this.dismissNotices(page);
+    await this.press(page, post);
 
     if (!(await this.present(page, SELECTORS.posted, this.config.timeoutMs))) {
       throw new PublishFailedError('TikTok never confirmed the post.', true, {
         uploadUrl: this.config.uploadUrl,
       });
     }
+  }
+
+  /**
+   * Clicks a button that something may still be sitting on top of.
+   *
+   * The second attempt dispatches the click on the element itself, which no
+   * overlay can intercept because no pointer is involved. Playwright's own
+   * `force` is not that — it skips the checks but still aims a real mouse at
+   * the coordinates, where the overlay is the thing that receives it.
+   */
+  private async press(page: Page, target: Locator): Promise<void> {
+    try {
+      await target.click({ timeout: CLICK_MS });
+
+      return;
+    } catch {
+      // Obstructed. Retry without the pointer rather than against it.
+    }
+
+    this.logger.warn('The Post button was obstructed; clicking it without the pointer', {
+      source: PlaywrightPublishService.name,
+    });
+
+    await this.dismissNotices(page);
+    await target.evaluate((element: { click: () => void }) => {
+      element.click();
+    });
   }
 
   /**
