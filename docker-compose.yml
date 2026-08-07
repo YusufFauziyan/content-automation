@@ -83,6 +83,8 @@ services:
       FFPROBE_PATH: ffprobe
       TIKTOK_HEADLESS: 'false'
       YOUTUBE_HEADLESS: 'false'
+      TIKTOK_MAX_RETRIES: '0'
+      YOUTUBE_MAX_RETRIES: '0'
     # `serve` is the long-running command: the HTTP API the editor talks to,
     # plus the scheduler tick. Without it the image would run one CLI job.
     command: ['/app/scripts/start-backend.sh', 'serve']

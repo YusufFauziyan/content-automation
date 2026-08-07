@@ -60,7 +60,7 @@ export class PublishTimeoutError extends ApplicationError {
     super({
       code: ErrorCode.PublishTimeout,
       message: `Publishing did not get past ${stage} within ${String(timeoutMs)}ms.`,
-      retryable: true,
+      retryable: false,
       details: { timeoutMs, stage, ...(details ?? {}) },
     });
   }
@@ -78,7 +78,7 @@ export class PublishNotVerifiedError extends ApplicationError {
     super({
       code: ErrorCode.PublishNotVerified,
       message: `The upload was submitted but ${externalUrl} could not be confirmed as live.`,
-      retryable: true,
+      retryable: false,
       details: { externalUrl, ...(details ?? {}) },
     });
   }

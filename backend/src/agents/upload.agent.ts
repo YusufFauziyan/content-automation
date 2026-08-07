@@ -146,13 +146,13 @@ export class BrowserUploadAgent implements UploadAgent {
         return fail(error);
       }
 
-      // An unrecognised throw out of a browser is almost always transient — a
-      // socket, a crashed page — so it is worth one more attempt rather than
-      // failing the run outright.
+      // An unrecognised throw out of a browser must not be retried automatically,
+      // as a browser that closed right after submitting an upload would cause
+      // duplicate video posts on the platform.
       return fail(
         new PublishFailedError(
           error instanceof Error ? error.message : 'The browser failed unexpectedly.',
-          true,
+          false,
           { contentId: input.contentId },
         ),
       );
