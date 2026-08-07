@@ -85,7 +85,7 @@ services:
       YOUTUBE_HEADLESS: 'false'
     # `serve` is the long-running command: the HTTP API the editor talks to,
     # plus the scheduler tick. Without it the image would run one CLI job.
-    command: ['node', 'dist/main.js', 'serve']
+    command: ['/app/scripts/start-backend.sh', 'serve']
     ports:
       - '${BACKEND_PORT:-4000}:4000'
       - '6080:6080'
