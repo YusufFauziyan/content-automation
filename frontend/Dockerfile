@@ -30,7 +30,7 @@ RUN pnpm install --frozen-lockfile --fetch-timeout 300000
 FROM deps AS build
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
-COPY tsconfig.json next.config.mjs postcss.config.mjs next-env.d.ts middleware.ts ./
+COPY tsconfig.json next.config.mjs postcss.config.mjs middleware.ts ./
 COPY app ./app
 COPY components ./components
 COPY lib ./lib
