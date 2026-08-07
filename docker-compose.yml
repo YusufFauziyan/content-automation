@@ -52,9 +52,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - media-scratch:/app/output
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-yutomation}:${POSTGRES_PASSWORD:-change-me-locally}@postgres:5432/${POSTGRES_DB:-yutomation}?schema=public
-    command: ['node_modules/.bin/prisma', 'migrate', 'deploy']
+    command: ['sh', '-c', 'chown -R node:node /app/output && node_modules/.bin/prisma migrate deploy']
 
   backend:
     build:
